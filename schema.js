@@ -43,7 +43,6 @@ const {
   shallowClone,
   extend,
   pick,
-  omit,
   lazy
 } = require('./utils')
 
@@ -337,16 +336,11 @@ function createSchema ({ resolvers, objects, models }) {
           const property = properties[propertyName]
           if (!isScalarProperty(property)) return
 
-          const fieldOpts = {
+          fields[propertyName] = createField({
             propertyName,
             property,
             model,
             isInput: true
-          }
-
-          Object.defineProperty(fields, propertyName, {
-            enumerable: true,
-            get: lazy(() => createField(fieldOpts))
           })
         })
 
@@ -367,27 +361,17 @@ function createSchema ({ resolvers, objects, models }) {
           const property = properties[propertyName]
           if (property.type === 'array') return
 
-          Object.defineProperty(fields, propertyName, {
-            enumerable: true,
-            // lazy, because of circular references
-            get: () => {
-              if (!field) {
-                field = createField({
-                  propertyName,
-                  property: shallowClone(property, {
-                    type: 'array',
-                    items: {
-                      type: 'string'
-                    }
-                  }),
-                  model,
-                  isInput: true,
-                  operator
-                })
+          fields[propertyName] = createField({
+            propertyName,
+            property: shallowClone(property, {
+              type: 'array',
+              items: {
+                type: 'string'
               }
-
-              return field
-            }
+            }),
+            model,
+            isInput: true,
+            operator
           })
         })
 
@@ -431,22 +415,12 @@ function createSchema ({ resolvers, objects, models }) {
     propertyNames.forEach(propertyName => {
       let field
       const property = properties[propertyName]
-      Object.defineProperty(fields, propertyName, {
-        enumerable: true,
-        // lazy, because of circular references
-        get: () => {
-          if (!field) {
-            field = createField({
-              propertyName,
-              property,
-              model,
-              required,
-              isInput
-            })
-          }
-
-          return field
-        }
+      fields[propertyName] = createField({
+        propertyName,
+        property,
+        model,
+        required,
+        isInput
       })
     })
 
