@@ -24,6 +24,7 @@ const {
 } = require('graphql-iso-date')
 
 const {
+  normalizeModels,
   getTypeName,
   isResourceStub,
   isNullableProperty,
@@ -52,13 +53,6 @@ const primaryKeys = ['_link']
 const { TimestampType, BytesType, ResourceStubType } = require('./types')
 const StringWrapper = { type: GraphQLString }
 // TODO: use getFields for this
-const metadataTypes = {
-  _link: StringWrapper,
-  _permalink: StringWrapper,
-  _author: StringWrapper,
-  _time: { type: TimestampType },
-  _min: { type: GraphQLBoolean }
-}
 
 const SCALAR_OPERATORS = Object.keys(OPERATORS)
   .filter(name => OPERATORS[name].scalar)
@@ -72,9 +66,7 @@ const BaseObjectModel = require('./object-model')
 
 function createSchema ({ resolvers, objects, models }) {
   const TYPES = {}
-  // const metadataArgs = toNonNull(metadataTypes)
-  const primaryKeyArgs = toNonNull(pick(metadataTypes, primaryKeys))
-  const getBaseObjectType = () => getType({ model: BaseObjectModel })
+  models = normalizeModels(models)
 
   // function createMutationType ({ model }) {
   //   const required = getRequiredProperties(model)
@@ -411,7 +403,7 @@ function createSchema ({ resolvers, objects, models }) {
     const required = isInput ? [] : getRequiredProperties(model)
     const { properties } = model
     const propertyNames = getProperties(model)
-    const fields = shallowClone(metadataTypes)
+    const fields = {}
     propertyNames.forEach(propertyName => {
       let field
       const property = properties[propertyName]
@@ -575,7 +567,7 @@ function createSchema ({ resolvers, objects, models }) {
   //     }, metadataTypes),
   //     // args: () => extend({
   //     //   object: createMutationType({ model }),
-  //     // }, metadataArgs)
+  //     // }, basePropsArgs)
   //   })
   // }
 
@@ -658,6 +650,10 @@ function createSchema ({ resolvers, objects, models }) {
     return ret
   }
 
+
+  const basePropsTypes = getFields({ model: BaseObjectModel })
+  // const basePropsArgs = toNonNull(basePropsTypes)
+  const primaryKeyArgs = toNonNull(pick(basePropsTypes, primaryKeys))
   const schema = new GraphQLSchema({
     query: QueryType,
     // mutation: MutationType,

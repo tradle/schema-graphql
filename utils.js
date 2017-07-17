@@ -118,8 +118,8 @@ function withProtocolProps (model) {
   }
 
   return shallowClone(model, shallowClone({
-    properties: shallowClone(model.properties, PROTOCOL_PROPS),
-    required: unique(required.concat(REQUIRED_PROTOCOL_PROP_NAMES))
+    properties: shallowClone(model.properties, BaseObjectModel.properties),
+    required: unique(required.concat(BaseObjectModel.required || []))
   }))
 }
 
