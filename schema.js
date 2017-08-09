@@ -239,7 +239,8 @@ function createSchema ({ resolvers, objects, models }) {
     } else if (isInstantiable(model)) {
       ctor = GraphQLObjectType
     } else {
-      ctor = wrapInterfaceConstructor({ model })
+      return isInput ? ResourceStubType.input : ResourceStubType.output
+      // wrapInterfaceConstructor({ model })
     }
 
     return new ctor({
@@ -290,6 +291,9 @@ function createSchema ({ resolvers, objects, models }) {
       fields: () => {
         const fields = {
           EQ: {
+            type: getEqOperatorField({ model })
+          },
+          NEQ: {
             type: getEqOperatorField({ model })
           },
           IN: {
