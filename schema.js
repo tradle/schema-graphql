@@ -14,6 +14,7 @@ const {
   GraphQLInputObjectType
 } = require('graphql/type')
 
+const GraphQLRelay = require('graphql-relay')
 const GraphQLJSON = require('graphql-type-json')
 const { isInlinedProperty } = require('@tradle/validate-resource').utils
 const OPERATORS = require('./operators')
@@ -51,8 +52,10 @@ const StringWrapper = { type: GraphQLString }
 const SCALAR_OPERATORS = Object.keys(OPERATORS)
   .filter(name => OPERATORS[name].scalar)
 
+const CURSOR_PREFIX = ''// new Buffer('cursor:').toString('base64')
 const getGetterFieldName = type => `r_${getTypeName({ type })}`
-const getListerFieldName = type => `rl_${getTypeName({ type })}`
+// const getListerFieldName = type => `rl_${getTypeName({ type })}`
+const getConnectionFieldName = type => `rl_${getTypeName({ type })}`
 const getCreaterFieldName = type => `c_${getTypeName({ type })}`
 const getUpdaterFieldName = type => `u_${getTypeName({ type })}`
 const getDeleterFieldName = type => `d_${getTypeName({ type })}`
@@ -61,6 +64,25 @@ const BaseObjectModel = require('./object-model')
 function createSchema ({ resolvers, objects, models }) {
   const TYPES = {}
   models = normalizeModels(models)
+
+  const { nodeInterface, nodeField } = GraphQLRelay.nodeDefinitions(
+    globalId => {
+      const { type, id } = GraphQLRelay.fromGlobalId(globalId)
+      const model = getModel(type)
+      const key = idToPrimaryKey(id)
+      return resolvers.get({ model, key })
+    },
+    obj => {
+      const model = getModel(obj[TYPE])
+      return getType({ model })
+    }
+  )
+
+  const getModel = type => {
+    const model = models[type]
+    if (!model) throw new Error(`model not found: ${type}`)
+    return model
+  }
 
   // function createMutationType ({ model }) {
   //   const required = getRequiredProperties(model)
@@ -149,19 +171,56 @@ function createSchema ({ resolvers, objects, models }) {
   })
 
   const getBacklinkResolver = cachifyByModel(function ({ model }) {
-    return function (source, args, context, info) {
+    return co(function* (source, args, context, info) {
       const type = source[TYPE]
       const { fieldName } = info
       const { backlink } = models[type].properties[fieldName].items
-      return resolvers.list({
+      return fetchList({
         model,
         source,
         args: {
-          [backlink]: source._link
+          [backlink]: getId(source)
         }
-      })
-    }
+      }, args)
+    })
   })
+
+  const fetchList = (opts, args) => {
+    const { first, after, orderBy, filter } = args
+    if (after) {
+      opts.after = positionFromCursor(after)
+    }
+
+    opts.limit = first
+    opts.orderBy = orderBy
+    opts.filter = filter
+    return resolvers.list(opts).then(result => {
+      return connectionToArray(result, args)
+    })
+  }
+
+  const itemToEdge = ({ item, args, itemToPosition }) => {
+    const position = itemToPosition(item)
+    return {
+      cursor: positionToCursor(position),
+      node: item
+    }
+  }
+
+  const connectionToArray = (result, args) => {
+    const { items, position, itemToPosition } = result
+    const { first, last } = args
+    const edges = items.map(item => itemToEdge({ item, args, itemToPosition }))
+    return {
+      edges,
+      pageInfo: {
+        startCursor: edges.length ? edges[0].cursor : null,
+        endCursor: edges.length ? edges[edges.length - 1].cursor : null,
+        hasPreviousPage: typeof last === 'number' ? !!after : false,
+        hasNextPage: typeof first === 'number' ? edges.length === first : false
+      }
+    }
+  }
 
   const getLinkResolver = cachifyByModel(function ({ model }) {
     return function (source, args, context, info) {
@@ -172,9 +231,8 @@ function createSchema ({ resolvers, objects, models }) {
   })
 
   const getLister = cachifyByModel(function ({ model }) {
-    return function (source, args, context, info) {
-      return resolvers.list({ model, source, args, context, info })
-    }
+    return (source, args, context, info) =>
+      fetchList({ model, source, args, context, info }, args)
   })
 
   // function getPrimaryKeyProps (props) {
@@ -245,6 +303,23 @@ function createSchema ({ resolvers, objects, models }) {
     })
   })
 
+  const getConnectionType = ({ model }) =>
+    getConnectionDefinition({ model }).connectionType
+
+  const getEdgeType = ({ model }) =>
+    getConnectionDefinition({ model }).edgeType
+
+  const getConnectionDefinition = cachifyByModelAndInput(({ model }) => {
+    return GraphQLRelay.connectionDefinitions({
+      name: getTypeName({ model }),
+      nodeType: getType({ model })
+      // fields: {
+      //   edges: getEdge({ model }),
+      //   pageInfo: new GraphQLNonNull(PageInfoType)
+      // }
+    })
+  })
+
   function wrapInterfaceConstructor ({ model }) {
     return function (opts) {
       opts.resolveType = data => {
@@ -260,6 +335,7 @@ function createSchema ({ resolvers, objects, models }) {
     return interfaces.filter(isGoodInterface).map(type => {
       return getType({ model: models[type], isInput })
     })
+    .concat(nodeInterface)
   }
 
   const getOperatorFields = cachifyByModel(function ({ model }) {
@@ -402,6 +478,10 @@ function createSchema ({ resolvers, objects, models }) {
     const { properties } = model
     const propertyNames = getProperties(model)
     const fields = {}
+    if (!isInput) {
+      fields.id = GraphQLRelay.globalIdField(model.id, getId)
+    }
+
     propertyNames.forEach(propertyName => {
       let field
       const property = properties[propertyName]
@@ -528,6 +608,16 @@ function createSchema ({ resolvers, objects, models }) {
     }
   }
 
+  const PageInfoType = new GraphQLObjectType({
+    name: 'PageInfo',
+    fields: {
+      hasNextPage: GraphQLBoolean,
+      hasPreviousPage: GraphQLBoolean,
+      startCursor: GraphQLString,
+      endCursor: GraphQLString
+    }
+  })
+
   /**
    * This is the type that will be the root of our query,
    * and the entry point into our schema.
@@ -535,20 +625,32 @@ function createSchema ({ resolvers, objects, models }) {
   const QueryType = new GraphQLObjectType({
     name: 'Query',
     fields: () => {
-      const fields = {}
+      const fields = {
+        node: nodeField
+      }
+
       getInstantiableModels(models).forEach(id => {
         const model = models[id]
         const type = getType({ model })
-        fields[getListerFieldName(id)] = {
-          type: new GraphQLList(type),
-          args: getArgs({ model }),//  getType({ model, isInput: true }),
-          resolve: getLister({ model })
-        }
+        // fields[getListerFieldName(id)] = {
+        //   type: new GraphQLList(type),
+        //   args: getArgs({ model }),//  getType({ model, isInput: true }),
+        //   resolve: getLister({ model })
+        // }
 
         fields[getGetterFieldName(id)] = {
           type,
           args: primaryKeyArgs,
           resolve: getGetter({ model })
+        }
+
+        fields[getConnectionFieldName(id)] = {
+          type: getConnectionType({ model }),
+          args: extend(
+            getArgs({ model }),
+            GraphQLRelay.connectionArgs
+          ),
+          resolve: getLister({ model })
         }
       })
 
@@ -636,11 +738,12 @@ function createSchema ({ resolvers, objects, models }) {
     }
 
     const ret = {
-      type: getType({ model: range }),
+      type: getConnectionType({ model: range })
     }
 
     if (property.type === 'array') {
       ret.resolve = getBacklinkResolver({ model: range })
+      ret.args = GraphQLRelay.connectionArgs
     } else {
       ret.resolve = getLinkResolver({ model: range })
     }
@@ -682,6 +785,24 @@ function isGoodInterface (id) {
   return USE_INTERFACES &&
     id !== 'tradle.Message' &&
     id !== 'tradle.Document'
+}
+
+function positionToCursor (position) {
+  return CURSOR_PREFIX + new Buffer(JSON.stringify(position)).toString('base64')
+}
+
+function positionFromCursor (cursor) {
+  const pos = cursor.slice(CURSOR_PREFIX.length)
+  return JSON.parse(new Buffer(pos, 'base64'))
+  // return GraphQLRelay.fromGlobalId(globalId).id
+}
+
+function getId (item) {
+  return item._link
+}
+
+function idToPrimaryKey (id) {
+  return { _link: id }
 }
 
 module.exports = createSchema

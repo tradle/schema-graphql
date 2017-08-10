@@ -10,13 +10,13 @@ const {
 const { ResourceStubType } = require('./types')
 const BaseObjectModel = require('./object-model')
 const ObjectPropNames = Object.keys(BaseObjectModel.properties)
-const NON_VIRTUAL_PROP_NAMES = ObjectPropNames
-  .filter(name => !BaseObjectModel.properties[name].virtual)
+// const NON_VIRTUAL_PROP_NAMES = ObjectPropNames
+//   .filter(name => !BaseObjectModel.properties[name].virtual)
 
-const REQUIRED_PROTOCOL_PROP_NAMES = ObjectPropNames
-  .filter(name => BaseObjectModel.required.includes(name))
+// const REQUIRED_PROTOCOL_PROP_NAMES = ObjectPropNames
+//   .filter(name => BaseObjectModel.required.includes(name))
 
-const PROTOCOL_PROPS = pick(BaseObjectModel.properties, NON_VIRTUAL_PROP_NAMES)
+// const PROTOCOL_PROPS = pick(BaseObjectModel.properties, NON_VIRTUAL_PROP_NAMES)
 
 module.exports = {
   pick,
@@ -176,7 +176,13 @@ function getRef (property) {
 }
 
 function getProperties (model) {
-  return Object.keys(model.properties)
+  const props = Object.keys(model.properties)
+  if (props.includes('id')) {
+    throw new Error(`"id" is a reserved property, model ${model.id} needs to learn its place`)
+  }
+
+  return props
+
     // .filter(propertyName => {
     //   return propertyName.charAt(0) !== '_'
     // })

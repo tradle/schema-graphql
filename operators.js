@@ -2,6 +2,9 @@ module.exports = {
   EQ: {
     type: 'any'
   },
+  NEQ: {
+    type: 'any'
+  },
   IN: {
     type: 'array'
   },
