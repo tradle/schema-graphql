@@ -18,12 +18,6 @@ const GraphQLJSON = require('graphql-type-json')
 const { isInlinedProperty } = require('@tradle/validate-resource').utils
 const OPERATORS = require('./operators')
 const {
-  GraphQLDate,
-  // GraphQLTime,
-  // GraphQLDateTime
-} = require('graphql-iso-date')
-
-const {
   normalizeModels,
   getTypeName,
   isResourceStub,
@@ -478,7 +472,7 @@ function createSchema ({ resolvers, objects, models }) {
       case 'number':
         return { type: GraphQLFloat }
       case 'date':
-        return { type: GraphQLDate }
+        return { type: TimestampType }
       case 'object':
         return getObjectValueType({
           model,
