@@ -20,6 +20,7 @@
     "prepush": "npm test"
   },
   "dependencies": {
+    "@tradle/build-resource": "tradle/build-resource",
     "co": "^4.6.0",
     "debug": "^2.6.6",
     "deep-equal": "^1.0.1",
@@ -34,6 +35,7 @@
   "peerDependencies": {
     "@tradle/models": "*",
     "@tradle/validate-model": "*",
-    "@tradle/validate-resource": "*"
+    "@tradle/validate-resource": "*",
+    "@tradle/engine": "*"
   }
 }

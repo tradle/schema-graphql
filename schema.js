@@ -17,6 +17,7 @@ const {
 const GraphQLRelay = require('graphql-relay')
 const GraphQLJSON = require('graphql-type-json')
 const { isInlinedProperty } = require('@tradle/validate-resource').utils
+const buildResource = require('@tradle/build-resource')
 const OPERATORS = require('./operators')
 const {
   normalizeModels,
@@ -173,19 +174,29 @@ function createSchema ({ resolvers, objects, models }) {
   const getBacklinkResolver = cachifyByModel(function ({ model }) {
     return co(function* (source, args, context, info) {
       const type = source[TYPE]
+      const model = models[type]
       const { fieldName } = info
-      const { backlink } = models[type].properties[fieldName].items
+      const { backlink } = model.properties[fieldName].items
+      const backlinkId = `${backlink}.id`
       return fetchList({
         model,
         source,
         args: {
-          [backlink]: getId(source)
+          filter: {
+            EQ: {
+              [backlinkId]: buildResource.id({
+                model,
+                resource: source
+              })
+            }
+          }
         }
-      }, args)
+      })
     })
   })
 
-  const fetchList = (opts, args) => {
+  const fetchList = (opts) => {
+    const { args } = opts
     const { first, after, orderBy, filter } = args
     if (after) {
       opts.after = positionFromCursor(after)
@@ -232,7 +243,7 @@ function createSchema ({ resolvers, objects, models }) {
 
   const getLister = cachifyByModel(function ({ model }) {
     return (source, args, context, info) =>
-      fetchList({ model, source, args, context, info }, args)
+      fetchList({ model, source, args, context, info })
   })
 
   // function getPrimaryKeyProps (props) {
@@ -479,7 +490,7 @@ function createSchema ({ resolvers, objects, models }) {
     const propertyNames = getProperties(model)
     const fields = {}
     if (!isInput) {
-      fields.id = GraphQLRelay.globalIdField(model.id, getId)
+      fields.id = GraphQLRelay.globalIdField(model.id, getPrimaryKey)
     }
 
     propertyNames.forEach(propertyName => {
@@ -695,9 +706,9 @@ function createSchema ({ resolvers, objects, models }) {
 
   function getRefType ({ propertyName, property, model, isInput }) {
     let { type, resolve } = _getRefType(arguments[0])
-    if (property.type === 'array') {
-      type = new GraphQLList(type)
-    }
+    // if (property.type === 'array') {
+    //   type = new GraphQLList(type)
+    // }
 
     return { type, resolve }
   }
@@ -743,7 +754,10 @@ function createSchema ({ resolvers, objects, models }) {
 
     if (property.type === 'array') {
       ret.resolve = getBacklinkResolver({ model: range })
-      ret.args = GraphQLRelay.connectionArgs
+      ret.args = extend(
+        getArgs({ model: range }),
+        GraphQLRelay.connectionArgs
+      )
     } else {
       ret.resolve = getLinkResolver({ model: range })
     }
@@ -797,7 +811,7 @@ function positionFromCursor (cursor) {
   // return GraphQLRelay.fromGlobalId(globalId).id
 }
 
-function getId (item) {
+function getPrimaryKey (item) {
   return item._link
 }
 

@@ -2,6 +2,15 @@
 # yarn lockfile v1
 
 
+"@tradle/build-resource@tradle/build-resource":
+  version "1.0.0"
+  resolved "https://codeload.github.com/tradle/build-resource/tar.gz/b0c546c5e493766ece3401d0212ac3cff27e8944"
+  dependencies:
+    clone "^2.1.0"
+    deep-equal "^1.0.1"
+    object.pick "^1.2.0"
+    xtend "^4.0.1"
+
 "@tradle/custom-models@https://github.com/tradle/custom-models":
   version "4.10.10"
   resolved "https://github.com/tradle/custom-models#15b66361757b92a0d5acb8753317856eeee6b689"
@@ -20,7 +29,7 @@
 
 "@tradle/validate-model@tradle/validate-model":
   version "1.0.0"
-  resolved "https://codeload.github.com/tradle/validate-model/tar.gz/a35d4a7c41e9ab9cd94f7ed6fa297275be908119"
+  resolved "https://codeload.github.com/tradle/validate-model/tar.gz/12bc1533e8ded2efaef7e127045b28530fd07371"
   dependencies:
     object.omit "^2.0.1"
     object.pick "^1.2.0"
@@ -29,8 +38,10 @@
 
 "@tradle/validate-resource@tradle/validate-resource":
   version "1.0.0"
-  resolved "https://codeload.github.com/tradle/validate-resource/tar.gz/c92abf1d9e9d56b05b8a4e62fad7b2adf21b9148"
+  resolved "https://codeload.github.com/tradle/validate-resource/tar.gz/488a74d590efec7e4eaa5d26af0ad95b4698d9d0"
   dependencies:
+    object.omit "^2.0.1"
+    object.pick "^1.2.0"
     traverse "^0.6.6"
 
 acorn-jsx@^3.0.0:
@@ -150,6 +161,10 @@ cli-cursor@^1.0.1:
 cli-width@^2.0.0:
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/cli-width/-/cli-width-2.1.0.tgz#b234ca209b29ef66fc518d9b98d5847b00edf00a"
+
+clone@^2.1.0:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/clone/-/clone-2.1.1.tgz#d217d1e961118e3ac9a4b8bba3285553bf647cdb"
 
 co@^4.6.0:
   version "4.6.0"
