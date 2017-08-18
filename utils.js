@@ -3,13 +3,17 @@ const omit = require('object.omit')
 const shallowClone = require('xtend')
 const extend = require('xtend/mutable')
 const deepEqual = require('deep-equal')
+const clone = require('clone')
 const {
   GraphQLNonNull,
 } = require('graphql/type')
 
+const { isInlinedProperty } = require('@tradle/validate-resource').utils
 const { ResourceStubType } = require('./types')
 const BaseObjectModel = require('./object-model')
 const ObjectPropNames = Object.keys(BaseObjectModel.properties)
+const { NESTED_PROP_SEPARATOR } = require('./constants')
+
 // const NON_VIRTUAL_PROP_NAMES = ObjectPropNames
 //   .filter(name => !BaseObjectModel.properties[name].virtual)
 
@@ -22,6 +26,7 @@ module.exports = {
   pick,
   omit,
   shallowClone,
+  clone,
   extend,
   deepEqual,
   lazy,
@@ -31,6 +36,7 @@ module.exports = {
   isNullableProperty,
   isScalarProperty,
   normalizeModels,
+  normalizeNestedProps,
   cachify,
   getValues,
   toNonNull,
@@ -161,10 +167,46 @@ function normalizeModels (models) {
   //   return !isInstantiable(model) || hasNonProtocolProps(model)
   // })
 
-  const withProtocol = mapObject(models, withProtocolProps)
-  const whole = mapObject(withProtocol, withHeaderProps)
-  return whole
+  models = mapObject(models, withProtocolProps, models)
+  models = mapObject(models, withHeaderProps, models)
+  // models = mapObject(models, withNestedProps, models)
   // return fixEnums(addedProtocol)
+  return models
+}
+
+function withNestedProps (model, models) {
+  const { properties } = model
+  getProperties(model).forEach(propertyName => {
+    const property = properties[propertyName]
+    if (property.type !== 'object' && property.type !== 'array') {
+      return
+    }
+
+    if (property.range === 'json') {
+      return
+    }
+
+    let nestedProps
+    if (isInlinedProperty({ models, property })) {
+      const ref = getRef(property)
+      if (ref === 'tradle.Model') return
+
+      nestedProps = ref
+        ? models[ref].properties
+        : property.properties || property.items.properties
+
+    } else {
+      nestedProps = ResourceStubProps
+    }
+
+    for (let p in nestedProps) {
+      let prop = shallowClone(nestedProps[p])
+      prop.nested = true
+      properties[`${propertyName}.${p}`] = prop
+    }
+  })
+
+  return model
 }
 
 function getRequiredProperties (model) {
@@ -223,10 +265,10 @@ function isSetOnCreate ({ model, propertyName }) {
   // if (!property.backlink) return true
 }
 
-function mapObject (obj, mapper) {
+function mapObject (obj, mapper, ...args) {
   const mapped = {}
   for (let key in obj) {
-    mapped[key] = mapper(obj[key])
+    mapped[key] = mapper(obj[key], ...args)
   }
 
   return mapped
@@ -259,4 +301,23 @@ function getTypeName ({ model, type, isInput }) {
   if (isInput) return `i_${base}`
 
   return base
+}
+
+/**
+ * Convert '__' to '.' in filter, e.g. document_id to document.id
+ */
+function normalizeNestedProps ({ args, model, models }) {
+  const { properties } = model
+  const { filter } = args
+  for (let comparator in filter) {
+    let vals = filter[comparator]
+    Object.keys(vals).forEach(propertyName => {
+      const val = vals[propertyName]
+      const path = propertyName.split('__')
+      if (path.length >= 2) {
+        vals[path.join('.')] = val
+        delete vals[propertyName]
+      }
+    })
+  }
 }

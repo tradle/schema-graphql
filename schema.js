@@ -34,12 +34,14 @@ const {
   getProperties,
   getRequiredProperties,
   getRef,
+  normalizeNestedProps,
   cachify,
   toNonNull,
   getValues,
   shallowClone,
   extend,
   pick,
+  clone,
   lazy
 } = require('./utils')
 
@@ -47,11 +49,21 @@ const USE_INTERFACES = false
 const TYPE = '_t'
 const primaryKeys = ['_link']
 const { TimestampType, BytesType, ResourceStubType } = require('./types')
+const { NESTED_PROP_SEPARATOR } = require('./constants')
 const StringWrapper = { type: GraphQLString }
 // TODO: use getFields for this
 
 const SCALAR_OPERATORS = Object.keys(OPERATORS)
   .filter(name => OPERATORS[name].scalar)
+
+const ResourceStubProps = {
+  id: {
+    type: 'string'
+  },
+  title: {
+    type: 'string'
+  }
+}
 
 const CURSOR_PREFIX = ''// new Buffer('cursor:').toString('base64')
 const getGetterFieldName = type => `r_${getTypeName({ type })}`
@@ -177,7 +189,7 @@ function createSchema ({ resolvers, objects, models }) {
       const model = models[type]
       const { fieldName } = info
       const { backlink } = model.properties[fieldName].items
-      const backlinkId = `${backlink}.id`
+      const backlinkId = `${backlink}${NESTED_PROP_SEPARATOR}id`
       return fetchList({
         model,
         source,
@@ -242,8 +254,11 @@ function createSchema ({ resolvers, objects, models }) {
   })
 
   const getLister = cachifyByModel(function ({ model }) {
-    return (source, args, context, info) =>
-      fetchList({ model, source, args, context, info })
+    return (source, args, context, info) => {
+      args = clone(args)
+      normalizeNestedProps({ model, args })
+      return fetchList({ model, source, args, context, info })
+    }
   })
 
   // function getPrimaryKeyProps (props) {
@@ -503,6 +518,45 @@ function createSchema ({ resolvers, objects, models }) {
         required,
         isInput
       })
+
+      if (!isInput ||
+        property.type !== 'object' ||
+        property.range === 'json') {
+        return
+      }
+
+      let nestedProps
+      if (isInlinedProperty({ models, property })) {
+        const ref = getRef(property)
+        if (ref === 'tradle.Model') return
+
+        nestedProps = ref
+          ? models[ref].properties
+          : property.properties || property.items.properties
+
+      } else {
+        nestedProps = ResourceStubProps
+      }
+
+      for (let p in nestedProps) {
+        let nestedPropertyName = `${propertyName}${NESTED_PROP_SEPARATOR}${p}`
+        let field = createField({
+          propertyName: nestedPropertyName,
+          property: nestedProps[p],
+          model,
+          // model: {
+          //   properties:
+          // },
+          isInput
+        })
+
+        fields[nestedPropertyName] = field
+
+        // let prop = shallowClone(nestedProps[p])
+        // prop.nested = true
+        // properties[`${propertyName}.${p}`] = prop
+      }
+
     })
 
     return fields
@@ -513,7 +567,7 @@ function createSchema ({ resolvers, objects, models }) {
     property,
     model,
     required=[],
-    isInput=false,
+    isInput,
     operator
   }) {
     const { description } = property

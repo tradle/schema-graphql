@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@tradle/build-resource": "tradle/build-resource",
+    "clone": "^2.1.1",
     "co": "^4.6.0",
     "debug": "^2.6.6",
     "deep-equal": "^1.0.1",
@@ -33,9 +34,9 @@
     "xtend": "^4.0.1"
   },
   "peerDependencies": {
+    "@tradle/engine": "*",
     "@tradle/models": "*",
     "@tradle/validate-model": "*",
-    "@tradle/validate-resource": "*",
-    "@tradle/engine": "*"
+    "@tradle/validate-resource": "*"
   }
 }
