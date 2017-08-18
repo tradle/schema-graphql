@@ -249,7 +249,13 @@ function getTypeName ({ model, type, isInput }) {
     type = model.id
   }
 
-  const base = type.replace(/[^a-zA-Z-_0-9]/g, '_')
+  const base = type.replace(/[^_a-zA-Z0-9]/g, '_')
+
+  // graphql constraint
+  if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(base)) {
+    throw new Error('unable to sanitize type name: ' + type)
+  }
+
   if (isInput) return `i_${base}`
 
   return base
