@@ -16,6 +16,7 @@ const {
 
 const GraphQLRelay = require('graphql-relay')
 const GraphQLJSON = require('graphql-type-json')
+const graphqlFields = require('graphql-fields')
 const { isInlinedProperty } = require('@tradle/validate-resource').utils
 const buildResource = require('@tradle/build-resource')
 const OPERATORS = require('./operators')
@@ -41,6 +42,7 @@ const {
   shallowClone,
   extend,
   pick,
+  omit,
   clone,
   lazy
 } = require('./utils')
@@ -208,12 +210,14 @@ function createSchema ({ resolvers, objects, models }) {
   })
 
   const fetchList = (opts) => {
-    const { args } = opts
+    const { args, info } = opts
     const { first, after, orderBy, filter } = args
     if (after) {
       opts.after = positionFromCursor(after)
     }
 
+    const fields = graphqlFields(info)
+    opts.select = omit(fields.edges.node, ['id'])
     opts.limit = first
     opts.orderBy = orderBy
     opts.filter = filter
