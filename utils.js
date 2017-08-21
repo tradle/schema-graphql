@@ -112,7 +112,7 @@ function isScalarProperty (property) {
 //   return filtered
 // }
 
-function withProtocolProps (model) {
+function addProtocolProps (model) {
   let required = model.required || []
   while (true) {
     let expanded = expandGroupProps(model, required)
@@ -123,16 +123,12 @@ function withProtocolProps (model) {
     required = expanded
   }
 
-  return shallowClone(model, shallowClone({
-    properties: shallowClone(model.properties, BaseObjectModel.properties),
-    required: unique(required.concat(BaseObjectModel.required || []))
-  }))
+  extend(model.properties, clone(BaseObjectModel.properties))
+  model.required = unique(required.concat(BaseObjectModel.required || []))
 }
 
-function withHeaderProps (model) {
-  return shallowClone(model, shallowClone({
-    properties: shallowClone(model.properties, BaseObjectModel.properties)
-  }))
+function addHeaderProps (model) {
+  extend(model.properties, clone(BaseObjectModel.properties))
 }
 
 function expandGroupProps (model, arr) {
@@ -167,25 +163,22 @@ function normalizeModels (models) {
   //   return !isInstantiable(model) || hasNonProtocolProps(model)
   // })
 
-  models = mapObject(models, withProtocolProps, models)
-  models = mapObject(models, withHeaderProps, models)
-  models = mapObject(models, withCustomProps, models)
-  // models = mapObject(models, withNestedProps, models)
+  models = clone(models)
+  forEachPropIn(models, addProtocolProps, models)
+  forEachPropIn(models, addHeaderProps, models)
+  forEachPropIn(models, addCustomProps, models)
+  // models = forEachPropIn(models, addNestedProps, models)
   // return fixEnums(addedProtocol)
   return models
 }
 
-function withCustomProps (model) {
-  return shallowClone(model, shallowClone({
-    properties: shallowClone(model.properties, {
-      _authorTitle: {
-        type: 'string'
-      }
-    })
-  }))
+function addCustomProps (model) {
+  model.properties._authorTitle = {
+    type: 'string'
+  }
 }
 
-// function withNestedProps (model, models) {
+// function addNestedProps (model, models) {
 //   const { properties } = model
 //   getProperties(model).forEach(propertyName => {
 //     const property = properties[propertyName]
@@ -283,6 +276,12 @@ function mapObject (obj, mapper, ...args) {
   }
 
   return mapped
+}
+
+function forEachPropIn (obj, mapper, ...args) {
+  for (let key in obj) {
+    mapper(obj[key], ...args)
+  }
 }
 
 function lazy (fn) {
