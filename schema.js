@@ -235,14 +235,14 @@ function createSchema ({ resolvers, objects, models }) {
   }
 
   const connectionToArray = (result, args) => {
-    const { items, position, itemToPosition } = result
+    const { items, startPosition, endPosition, itemToPosition } = result
     const { first, last } = args
     const edges = items.map(item => itemToEdge({ item, args, itemToPosition }))
     return {
       edges,
       pageInfo: {
-        startCursor: edges.length ? edges[0].cursor : null,
-        endCursor: edges.length ? edges[edges.length - 1].cursor : null,
+        startCursor: edges.length ? positionToCursor(startPosition) : null,
+        endCursor: edges.length ? positionToCursor(endPosition) : null,
         hasPreviousPage: typeof last === 'number' ? !!after : false,
         hasNextPage: typeof first === 'number' ? edges.length === first : false
       }
