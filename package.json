@@ -20,7 +20,7 @@
     "prepush": "npm test"
   },
   "dependencies": {
-    "@tradle/build-resource": "tradle/build-resource",
+    "@tradle/build-resource": "^2.0.0",
     "clone": "^2.1.1",
     "co": "^4.6.0",
     "debug": "^2.6.6",
