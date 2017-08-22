@@ -375,9 +375,6 @@ function createSchema ({ resolvers, objects, models }) {
       },
       orderBy: {
         type: getOrderByField({ model })
-      },
-      limit: {
-        type: GraphQLInt
       }
     }
   })
