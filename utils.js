@@ -8,7 +8,7 @@ const {
   GraphQLNonNull,
 } = require('graphql/type')
 
-const { isInlinedProperty } = require('@tradle/validate-resource').utils
+const { isInlinedProperty, isInstantiable } = require('@tradle/validate-resource').utils
 const { ResourceStubType } = require('./types')
 const BaseObjectModel = require('./object-model')
 const ObjectPropNames = Object.keys(BaseObjectModel.properties)
@@ -43,7 +43,6 @@ module.exports = {
   getProperties,
   getRequiredProperties,
   getInstantiableModels,
-  isInstantiable,
   getRef,
   getTypeName
 }
@@ -236,15 +235,6 @@ function getProperties (model) {
 
 function getInstantiableModels (models) {
   return Object.keys(models).filter(id => isInstantiable(models[id]))
-}
-
-function isInstantiable (model) {
-  const { id, isInterface, abstract } = model
-  if (id === 'tradle.Model' || isInterface || abstract) {
-    return false
-  }
-
-  return true
 }
 
 function getOnCreateProperties ({ model, models }) {

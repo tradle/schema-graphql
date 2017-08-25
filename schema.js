@@ -17,7 +17,7 @@ const {
 const GraphQLRelay = require('graphql-relay')
 const GraphQLJSON = require('graphql-type-json')
 const graphqlFields = require('graphql-fields')
-const { isInlinedProperty } = require('@tradle/validate-resource').utils
+const { isInlinedProperty, isInstantiable } = require('@tradle/validate-resource').utils
 const buildResource = require('@tradle/build-resource')
 const OPERATORS = require('./operators')
 const {
@@ -30,7 +30,6 @@ const {
   isBadEnumModel,
   fromResourceStub,
   getInstantiableModels,
-  isInstantiable,
   getOnCreateProperties,
   getProperties,
   getRequiredProperties,
