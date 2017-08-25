@@ -42,8 +42,7 @@ const {
   extend,
   pick,
   omit,
-  clone,
-  lazy
+  clone
 } = require('./utils')
 
 const USE_INTERFACES = false
@@ -189,21 +188,30 @@ function createSchema ({ resolvers, objects, models }) {
       const type = source[TYPE]
       const model = models[type]
       const { fieldName } = info
-      const { backlink } = model.properties[fieldName].items
-      const backlinkId = `${backlink}${NESTED_PROP_SEPARATOR}id`
+      const backlinkProp = model.properties[fieldName]
+      const ref = getRef(backlinkProp)
+      const backlinkModel = models[ref]
+      if (!(backlinkModel && isInstantiable(backlinkModel))) {
+        debug(`unable to resolve backlink: ${model.id}.${fieldName}`)
+        return []
+      }
+
+      const { backlink } = backlinkProp.items
+      const backlinkDotId = `${backlink}.id`
       return fetchList({
-        model,
+        model: backlinkModel,
         source,
         args: {
           filter: {
             EQ: {
-              [backlinkId]: buildResource.id({
+              [backlinkDotId]: buildResource.id({
                 model,
                 resource: source
               })
             }
           }
-        }
+        },
+        info
       })
     })
   })
@@ -235,7 +243,7 @@ function createSchema ({ resolvers, objects, models }) {
 
   const connectionToArray = (result, args) => {
     const { items, startPosition, endPosition, itemToPosition } = result
-    const { first, last } = args
+    const { first, last, after } = args
     const edges = items.map(item => itemToEdge({ item, args, itemToPosition }))
     return {
       edges,
@@ -335,8 +343,8 @@ function createSchema ({ resolvers, objects, models }) {
   const getConnectionType = ({ model }) =>
     getConnectionDefinition({ model }).connectionType
 
-  const getEdgeType = ({ model }) =>
-    getConnectionDefinition({ model }).edgeType
+  // const getEdgeType = ({ model }) =>
+  //   getConnectionDefinition({ model }).edgeType
 
   const getConnectionDefinition = cachifyByModelAndInput(({ model }) => {
     return GraphQLRelay.connectionDefinitions({
@@ -374,6 +382,9 @@ function createSchema ({ resolvers, objects, models }) {
       },
       orderBy: {
         type: getOrderByField({ model })
+      },
+      limit: {
+        type: GraphQLInt
       }
     }
   })
@@ -647,6 +658,7 @@ function createSchema ({ resolvers, objects, models }) {
   function getArrayValueType (opts) {
     const { model, propertyName, property, isInput } = opts
     if (getRef(property)) {
+      // backlink or array of forward links
       return getRefType(opts)
     }
 
@@ -663,6 +675,7 @@ function createSchema ({ resolvers, objects, models }) {
       }
     }
 
+    // array of a primitive type
     return {
       type: new GraphQLList(getFieldType({
         model,
@@ -711,16 +724,20 @@ function createSchema ({ resolvers, objects, models }) {
 
         fields[getConnectionFieldName(id)] = {
           type: getConnectionType({ model }),
-          args: extend(
-            getArgs({ model }),
-            GraphQLRelay.connectionArgs
-          ),
+          args: getConnectionArgs({ model }),
           resolve: getLister({ model })
         }
       })
 
       return fields
     }
+  })
+
+  const getConnectionArgs = cachifyByModel(({ model }) => {
+    return extend(
+      getArgs({ model }),
+      GraphQLRelay.connectionArgs
+    )
   })
 
   // const createWrappedMutationType = function createWrappedMutationType ({ model }) {
@@ -759,15 +776,6 @@ function createSchema ({ resolvers, objects, models }) {
   })
 
   function getRefType ({ propertyName, property, model, isInput }) {
-    let { type, resolve } = _getRefType(arguments[0])
-    // if (property.type === 'array') {
-    //   type = new GraphQLList(type)
-    // }
-
-    return { type, resolve }
-  }
-
-  function _getRefType ({ propertyName, property, model, isInput }) {
     const ref = getRef(property)
     const range = models[ref]
     if (!range || isBadEnumModel(range)) {
@@ -779,6 +787,10 @@ function createSchema ({ resolvers, objects, models }) {
     }
 
     if (isGoodEnumModel(range)) {
+      return { type: GraphQLString }
+    }
+
+    if (range.subClassOf === 'tradle.Enum') {
       return { type: ResourceStubType.output }
     }
 
@@ -802,18 +814,18 @@ function createSchema ({ resolvers, objects, models }) {
       }
     }
 
-    const ret = {
-      type: getConnectionType({ model: range })
-    }
-
+    const ret = {}
     if (property.type === 'array') {
-      ret.resolve = getBacklinkResolver({ model: range })
-      ret.args = extend(
-        getArgs({ model: range }),
-        GraphQLRelay.connectionArgs
-      )
+      if (property.items.backlink) {
+        ret.type = getConnectionType({ model: range })
+        ret.resolve = getBacklinkResolver({ model: range })
+        ret.args = getConnectionArgs({ model: range })
+      } else {
+        ret.type = new GraphQLList(ResourceStubType.output)
+      }
     } else {
-      ret.resolve = getLinkResolver({ model: range })
+      ret.type = ResourceStubType.output
+      // ret.resolve = getLinkResolver({ model: range })
     }
 
     return ret

@@ -8,7 +8,13 @@ const {
   GraphQLNonNull,
 } = require('graphql/type')
 
-const { isInlinedProperty, isInstantiable } = require('@tradle/validate-resource').utils
+const { TYPE } = require('@tradle/constants')
+const {
+  isInlinedProperty,
+  parseId,
+  setVirtual,
+  isInstantiable
+} = require('@tradle/validate-resource').utils
 const { ResourceStubType } = require('./types')
 const BaseObjectModel = require('./object-model')
 const ObjectPropNames = Object.keys(BaseObjectModel.properties)
@@ -44,7 +50,8 @@ module.exports = {
   getRequiredProperties,
   getInstantiableModels,
   getRef,
-  getTypeName
+  getTypeName,
+  fromResourceStub
 }
 
 function cachify (fn, getId, cache={}) {
@@ -304,7 +311,8 @@ function getTypeName ({ model, type, isInput }) {
 }
 
 /**
- * Convert '__' to '.' in filter, e.g. document_id to document.id
+ * Convert NESTED_PROP_SEPARATOR to '.' in filter,
+ * e.g. document__id to document.id
  */
 function normalizeNestedProps ({ args, model, models }) {
   const { properties } = model
@@ -313,11 +321,26 @@ function normalizeNestedProps ({ args, model, models }) {
     let vals = filter[comparator]
     Object.keys(vals).forEach(propertyName => {
       const val = vals[propertyName]
-      const path = propertyName.split('__')
+      const path = propertyName.split(NESTED_PROP_SEPARATOR)
       if (path.length >= 2) {
         vals[path.join('.')] = val
         delete vals[propertyName]
       }
     })
   }
+}
+
+function fromResourceStub ({ id, title }) {
+  const { type, link, permalink } = parseId(id)
+  const resource = {
+    [TYPE]: type
+  }
+
+  setVirtual(resource, {
+    _link: link,
+    _permalink: permalink,
+    _displayName: title
+  })
+
+  return resource
 }
