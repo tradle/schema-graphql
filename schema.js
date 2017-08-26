@@ -17,7 +17,11 @@ const {
 const GraphQLRelay = require('graphql-relay')
 const GraphQLJSON = require('graphql-type-json')
 const graphqlFields = require('graphql-fields')
-const { isInlinedProperty, isInstantiable } = require('@tradle/validate-resource').utils
+const {
+  isInlinedProperty,
+  isInstantiable,
+  isEnum
+} = require('@tradle/validate-resource').utils
 const buildResource = require('@tradle/build-resource')
 const OPERATORS = require('./operators')
 const {
@@ -285,45 +289,20 @@ function createSchema ({ resolvers, objects, models }) {
   // }
 
   const getEnumType = cachifyByModelAndInput(function ({ model, isInput }) {
-    const ctor = isInput ? GraphQLInputObjectType : GraphQLObjectType
-    return new ctor({
-      name: getTypeName({ model, isInput }),
-      description: model.description,
-      fields: {
-        id: {
-          type: new GraphQLNonNull(GraphQLString)
-        },
-        title: StringWrapper
-      }
-    })
-
-    // TODO: uncomment after enums are refactored
-    // to be more like enums and less like resources
-
-    // const values = {}
-    // for (const value of model.enum) {
-    //   const { id, title } = value
-    //   values[sanitizeEnumValueName(id)] = {
-    //     value: id,
-    //     description: title
-    //   }
-    // }
-
-    // return new GraphQLEnumType({
-    //   name: getTypeName({ model }),
-    //   description: model.description,
-    //   values
-    // })
-  })
-
-  const getType = cachifyByModelAndInput(function ({ model, isInput }) {
     if (isGoodEnumModel(model)) {
-      return getEnumType({ model, isInput })
+      return getResourceStubType({ isInput })
     }
 
-    if (isBadEnumModel(model)) {
-      debug(`bad enum: ${model.id}`)
-      return GraphQLJSON
+    return GraphQLJSON
+  })
+
+  function getResourceStubType ({ isInput }) {
+    return isInput ? ResourceStubType.input : ResourceStubType.output
+  }
+
+  const getType = cachifyByModelAndInput(function ({ model, isInput }) {
+    if (isEnum(model)) {
+      return getEnumType({ model, isInput })
     }
 
     let ctor
@@ -617,6 +596,7 @@ function createSchema ({ resolvers, objects, models }) {
   }
 
   function _getFieldType ({ propertyName, property, model, isRequired, isInput }) {
+    if (propertyName === 'typeOfCoverage') debugger
     const { type, range } = property
     if (range === 'json') {
       return { type: GraphQLJSON }
@@ -648,8 +628,7 @@ function createSchema ({ resolvers, objects, models }) {
           isInput
         })
       case 'enum':
-        debug(`unexpected property type: ${type}`)
-        return { type: GraphQLJSON }
+        return { type: GraphQLString }
       default:
         throw new Error(`${model.id} property ${propertyName} has unexpected type: ${type}`)
     }
@@ -782,20 +761,16 @@ function createSchema ({ resolvers, objects, models }) {
   function getRefType ({ propertyName, property, model, isInput }) {
     const ref = getRef(property)
     const range = models[ref]
-    if (!range || isBadEnumModel(range)) {
+    if (!range) {
       return { type: GraphQLJSON }
+    }
+
+    if (range.subClassOf === 'tradle.Enum') {
+      return { type: getEnumType({ model: range, isInput }) }
     }
 
     if (isInput) {
       return { type: ResourceStubType.input }
-    }
-
-    if (isGoodEnumModel(range)) {
-      return { type: GraphQLString }
-    }
-
-    if (range.subClassOf === 'tradle.Enum') {
-      return { type: ResourceStubType.output }
     }
 
     // e.g. interface or abstract class

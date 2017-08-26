@@ -9,7 +9,7 @@
     "@tradle/custom-models": "https://github.com/tradle/custom-models",
     "@tradle/models": "https://github.com/tradle/models",
     "@tradle/validate-model": "^2.0.2",
-    "@tradle/validate-resource": "^2.3.0",
+    "@tradle/validate-resource": "^2.5.0",
     "eslint": "^3.19.0",
     "husky": "^0.13.3",
     "tape": "^4.6.3"
