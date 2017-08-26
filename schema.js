@@ -179,6 +179,10 @@ function createSchema ({ resolvers, objects, models }) {
   const getByPrimaryKey = co(function* ({ model, key, props }) {
     if (!key) key = pick(props, primaryKeys)
 
+    if (typeof key === 'object' && primaryKeys.length === 1) {
+      key = firstPropertyValue(key)
+    }
+
     // TODO: add ProjectionExpression with attributes to fetch
     return resolvers.get({ model, key })
   })
@@ -883,6 +887,10 @@ function getPrimaryKey (item) {
 
 function idToPrimaryKey (id) {
   return { _link: id }
+}
+
+function firstPropertyValue (obj) {
+  for (let key in obj) return obj[key]
 }
 
 module.exports = createSchema
