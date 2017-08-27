@@ -1,3 +1,4 @@
+const debug = require('debug')(require('./package').name)
 const pick = require('object.pick')
 const omit = require('object.omit')
 const shallowClone = require('xtend')
@@ -29,6 +30,7 @@ const { NESTED_PROP_SEPARATOR } = require('./constants')
 // const PROTOCOL_PROPS = pick(BaseObjectModel.properties, NON_VIRTUAL_PROP_NAMES)
 
 module.exports = {
+  debug,
   pick,
   omit,
   shallowClone,

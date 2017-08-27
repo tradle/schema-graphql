@@ -1,5 +1,4 @@
 const co = require('co').wrap
-const debug = require('debug')(require('./package.json').name)
 const {
   GraphQLSchema,
   GraphQLNonNull,
@@ -46,7 +45,8 @@ const {
   extend,
   pick,
   omit,
-  clone
+  clone,
+  debug
 } = require('./utils')
 
 const USE_INTERFACES = false
@@ -237,6 +237,7 @@ function createSchema ({ resolvers, objects, models }) {
     opts.orderBy = orderBy
     opts.filter = filter
     return resolvers.list(opts).then(result => {
+      debug(`fetched ${result.items.length} for ${info.fieldName}`)
       return connectionToArray(result, args)
     })
   }
