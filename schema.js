@@ -490,12 +490,15 @@ function createSchema ({ resolvers, objects, models }) {
     const values = {}
     const { properties } = model
     for (let propertyName in properties) {
-      values[propertyName] = { value: propertyName }
       let property = properties[propertyName]
       let nestedProps = getNestedProps({ property })
-      for (let sub in nestedProps) {
-        let nestedPropertyName = getNestedPropertyName(propertyName, sub)
-        values[nestedPropertyName] = { value: nestedPropertyName }
+      if (nestedProps) {
+        for (let sub in nestedProps) {
+          let nestedPropertyName = getNestedPropertyName(propertyName, sub)
+          values[nestedPropertyName] = { value: nestedPropertyName }
+        }
+      } else {
+        values[propertyName] = { value: propertyName }
       }
     }
 
@@ -532,6 +535,8 @@ function createSchema ({ resolvers, objects, models }) {
       if (!isInput) return
 
       const nestedProps = getNestedProps({ property })
+      if (!nestedProps) return
+
       for (let p in nestedProps) {
         let nestedPropertyName = getNestedPropertyName(propertyName, p)
         let field = createField({
@@ -563,7 +568,7 @@ function createSchema ({ resolvers, objects, models }) {
   const getNestedProps = function ({ property }) {
     if (property.type !== 'object' ||
       property.range === 'json') {
-      return {}
+      return
     }
 
     if (isInlinedProperty({ models, property })) {

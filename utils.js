@@ -21,14 +21,6 @@ const BaseObjectModel = require('./object-model')
 const ObjectPropNames = Object.keys(BaseObjectModel.properties)
 const { NESTED_PROP_SEPARATOR } = require('./constants')
 
-// const NON_VIRTUAL_PROP_NAMES = ObjectPropNames
-//   .filter(name => !BaseObjectModel.properties[name].virtual)
-
-// const REQUIRED_PROTOCOL_PROP_NAMES = ObjectPropNames
-//   .filter(name => BaseObjectModel.required.includes(name))
-
-// const PROTOCOL_PROPS = pick(BaseObjectModel.properties, NON_VIRTUAL_PROP_NAMES)
-
 module.exports = {
   debug,
   pick,
@@ -131,12 +123,15 @@ function addProtocolProps (model) {
     required = expanded
   }
 
-  extend(model.properties, clone(BaseObjectModel.properties))
-  model.required = unique(required.concat(BaseObjectModel.required || []))
-}
-
-function addHeaderProps (model) {
-  extend(model.properties, clone(BaseObjectModel.properties))
+  if (model.inlined) {
+    model.properties[TYPE] =  clone(BaseObjectModel.properties[TYPE])
+    if (BaseObjectModel.required.includes(TYPE)) {
+      model.required = model.required.concat(TYPE)
+    }
+  } else {
+    extend(model.properties, clone(BaseObjectModel.properties))
+    model.required = unique(required.concat(BaseObjectModel.required || []))
+  }
 }
 
 function expandGroupProps (model, arr) {
@@ -173,7 +168,6 @@ function normalizeModels (models) {
 
   models = clone(models)
   forEachPropIn(models, addProtocolProps, models)
-  forEachPropIn(models, addHeaderProps, models)
   forEachPropIn(models, addCustomProps, models)
   // models = forEachPropIn(models, addNestedProps, models)
   // return fixEnums(addedProtocol)
@@ -181,6 +175,8 @@ function normalizeModels (models) {
 }
 
 function addCustomProps (model) {
+  if (model.inlined) return
+
   model.properties._authorTitle = {
     type: 'string'
   }
