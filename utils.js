@@ -11,7 +11,7 @@ const {
 
 const { TYPE } = require('@tradle/constants')
 const {
-  // isInlinedProperty,
+  isInlinedProperty,
   parseId,
   setVirtual,
   isInstantiable
@@ -19,7 +19,7 @@ const {
 const { ResourceStubType } = require('./types')
 const BaseObjectModel = require('./object-model')
 const ObjectPropNames = Object.keys(BaseObjectModel.properties)
-const { NESTED_PROP_SEPARATOR } = require('./constants')
+const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
 
 module.exports = {
   debug,
@@ -169,7 +169,7 @@ function normalizeModels (models) {
   models = clone(models)
   forEachPropIn(models, addProtocolProps, models)
   forEachPropIn(models, addCustomProps, models)
-  // models = forEachPropIn(models, addNestedProps, models)
+  forEachPropIn(models, addNestedProps, models)
   // return fixEnums(addedProtocol)
   return models
 }
@@ -182,40 +182,38 @@ function addCustomProps (model) {
   }
 }
 
-// function addNestedProps (model, models) {
-//   const { properties } = model
-//   getProperties(model).forEach(propertyName => {
-//     const property = properties[propertyName]
-//     if (property.type !== 'object' && property.type !== 'array') {
-//       return
-//     }
+function addNestedProps (model, models) {
+  const { properties } = model
+  getProperties(model).forEach(propertyName => {
+    const property = properties[propertyName]
+    if (property.type !== 'object' && property.type !== 'array') {
+      return
+    }
 
-//     if (property.range === 'json') {
-//       return
-//     }
+    if (property.range === 'json') {
+      return
+    }
 
-//     let nestedProps
-//     if (isInlinedProperty({ models, property })) {
-//       const ref = getRef(property)
-//       if (ref === 'tradle.Model') return
+    let nestedProps
+    if (isInlinedProperty({ models, property })) {
+      const ref = getRef(property)
+      if (ref === 'tradle.Model') return
 
-//       nestedProps = ref
-//         ? models[ref].properties
-//         : property.properties || property.items.properties
+      nestedProps = ref
+        ? models[ref].properties
+        : property.properties || property.items.properties
 
-//     } else {
-//       nestedProps = ResourceStubProps
-//     }
+    } else {
+      nestedProps = RESOURCE_STUB_PROPS
+    }
 
-//     for (let p in nestedProps) {
-//       let prop = shallowClone(nestedProps[p])
-//       prop.nested = true
-//       properties[`${propertyName}.${p}`] = prop
-//     }
-//   })
+    for (let p in nestedProps) {
+      properties[`${propertyName}.${p}`] = shallowClone(nestedProps[p])
+    }
+  })
 
-//   return model
-// }
+  return model
+}
 
 function getRequiredProperties (model) {
   return model.required || []
@@ -291,7 +289,7 @@ function lazy (fn) {
   }
 }
 
-function getTypeName ({ model, type, isInput }) {
+function getTypeName ({ model, type, operator }) {
   if (!type) {
     type = model.id
   }
@@ -303,7 +301,7 @@ function getTypeName ({ model, type, isInput }) {
     throw new Error('unable to sanitize type name: ' + type)
   }
 
-  if (isInput) return `i_${base}`
+  if (operator) return `${operator}_${base}`
 
   return base
 }

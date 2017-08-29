@@ -53,21 +53,13 @@ const USE_INTERFACES = false
 const TYPE = '_t'
 const primaryKeys = ['_link']
 const { TimestampType, BytesType, ResourceStubType } = require('./types')
-const { NESTED_PROP_SEPARATOR } = require('./constants')
+const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
 const StringWrapper = { type: GraphQLString }
 // TODO: use getFields for this
 
-const SCALAR_OPERATORS = Object.keys(OPERATORS)
-  .filter(name => OPERATORS[name].scalar)
-
-const ResourceStubProps = {
-  id: {
-    type: 'string'
-  },
-  title: {
-    type: 'string'
-  }
-}
+const OPERATOR_NAMES = Object.keys(OPERATORS)
+// const SCALAR_OPERATORS = Object.keys(OPERATORS)
+//   .filter(name => OPERATORS[name].scalar)
 
 const CURSOR_PREFIX = ''// new Buffer('cursor:').toString('base64')
 const getGetterFieldName = type => `r_${getTypeName({ type })}`
@@ -133,7 +125,7 @@ function createSchema ({ resolvers, objects, models }) {
   //     propertyName,
   //     property,
   //     model,
-  //     isInput: true,
+  //     operator,
   //     isRequired: required.indexOf(propertyName) !== -1
   //   })
 
@@ -289,38 +281,38 @@ function createSchema ({ resolvers, objects, models }) {
   //   return id.replace(/[^_a-zA-Z0-9]/g, '_')
   // }
 
-  const getEnumType = cachifyByModelAndInput(function ({ model, isInput }) {
+  const getEnumType = cachifyByModelAndInput(function ({ model, operator }) {
     if (isGoodEnumModel(model)) {
-      return getResourceStubType({ isInput })
+      return getResourceStubType({ operator })
     }
 
     return GraphQLJSON
   })
 
-  function getResourceStubType ({ isInput }) {
-    return isInput ? ResourceStubType.input : ResourceStubType.output
+  function getResourceStubType ({ operator }) {
+    return operator ? ResourceStubType.input : ResourceStubType.output
   }
 
-  const getType = cachifyByModelAndInput(function ({ model, isInput }) {
+  const getType = cachifyByModelAndOperatorType(function ({ model, operator }) {
     if (isEnum(model)) {
-      return getEnumType({ model, isInput })
+      return getEnumType({ model, operator })
     }
 
     let ctor
-    if (isInput) {
+    if (operator) {
       ctor = GraphQLInputObjectType
     } else if (isInstantiable(model)) {
       ctor = GraphQLObjectType
     } else {
-      return isInput ? ResourceStubType.input : ResourceStubType.output
+      return operator ? ResourceStubType.input : ResourceStubType.output
       // wrapInterfaceConstructor({ model })
     }
 
     return new ctor({
-      name: getTypeName({ model, isInput }),
+      name: getTypeName({ model, operator }),
       description: model.description,
-      interfaces: getInterfaces({ model, isInput }),
-      fields: () => getFields({ model, isInput })
+      interfaces: getInterfaces({ model, operator }),
+      fields: () => getFields({ model, operator })
     })
   })
 
@@ -330,7 +322,7 @@ function createSchema ({ resolvers, objects, models }) {
   // const getEdgeType = ({ model }) =>
   //   getConnectionDefinition({ model }).edgeType
 
-  const getConnectionDefinition = cachifyByModelAndInput(({ model }) => {
+  const getConnectionDefinition = cachifyByModel(({ model }) => {
     return GraphQLRelay.connectionDefinitions({
       name: getTypeName({ model }),
       nodeType: getType({ model })
@@ -351,10 +343,10 @@ function createSchema ({ resolvers, objects, models }) {
     }
   }
 
-  function getInterfaces ({ model, isInput }) {
+  function getInterfaces ({ model, operator }) {
     const { interfaces=[] } = model
     const myInterfaces = interfaces.filter(isGoodInterface).map(type => {
-      return getType({ model: models[type], isInput })
+      return getType({ model: models[type], operator })
     })
 
     if (isNodeModel(model)) {
@@ -372,26 +364,18 @@ function createSchema ({ resolvers, objects, models }) {
       orderBy: {
         type: getOrderByField({ model })
       },
-      limit: {
-        type: GraphQLInt
-      }
+      // limit: {
+      //   type: GraphQLInt
+      // }
     }
   })
 
-  // const getArgs = ({ model }) => getFields({ model, isInput: true })
   const getArgs = getOperatorFields
-
   const getFilterField = cachifyByModel(function ({ model }) {
     return new GraphQLInputObjectType({
       name: 'filter_' + getTypeName({ model }),
       fields: () => {
         const fields = {
-          EQ: {
-            type: getEqOperatorField({ model })
-          },
-          NEQ: {
-            type: getEqOperatorField({ model })
-          },
           IN: {
             type: getSelectorOperatorField({ model, operator: 'IN' })
           },
@@ -400,10 +384,10 @@ function createSchema ({ resolvers, objects, models }) {
           }
         }
 
-        SCALAR_OPERATORS.forEach(operator => {
+        OPERATOR_NAMES.forEach(operator => {
           if (!fields[operator]) {
             fields[operator] = {
-              type: getScalarComparatorField({ model, operator })
+              type: getType({ model, operator })
             }
           }
         })
@@ -413,34 +397,6 @@ function createSchema ({ resolvers, objects, models }) {
     })
   })
 
-  const getEqOperatorField = function getEqOperatorField ({ model }) {
-    return getType({ model, isInput: true })
-  }
-
-  const getScalarComparatorField = cachify(function ({ model, operator }) {
-    const { properties } = model
-    const propertyNames = getProperties(model)
-    return new GraphQLInputObjectType({
-      name: `${operator}_${getTypeName({ model })}`,
-      fields: () => {
-        const fields = {}
-        propertyNames.forEach(propertyName => {
-          const property = properties[propertyName]
-          if (!isScalarProperty(property)) return
-
-          fields[propertyName] = createField({
-            propertyName,
-            property,
-            model,
-            isInput: true
-          })
-        })
-
-        return fields
-      }
-    })
-  }, ({ model, operator }) => `${model.id}~${operator}`)
-
   const getSelectorOperatorField = cachify(function ({ model, operator }) {
     const { properties } = model
     const propertyNames = getProperties(model)
@@ -449,22 +405,25 @@ function createSchema ({ resolvers, objects, models }) {
       fields: () => {
         const fields = {}
         propertyNames.forEach(propertyName => {
-          let field
           const property = properties[propertyName]
           if (property.type === 'array') return
 
-          fields[propertyName] = createField({
-            propertyName,
-            property: shallowClone(property, {
-              type: 'array',
-              items: {
-                type: 'string'
-              }
-            }),
-            model,
-            isInput: true,
-            operator
-          })
+          if (isScalarProperty(property)) {
+            const fieldName = getFieldName(propertyName)
+            fields[fieldName] = createField({
+              propertyName,
+              property: shallowClone(property, {
+                type: 'array',
+                items: {
+                  type: property.type
+                }
+              }),
+              model,
+              operator
+            })
+
+            return
+          }
         })
 
         return fields
@@ -491,15 +450,8 @@ function createSchema ({ resolvers, objects, models }) {
     const { properties } = model
     for (let propertyName in properties) {
       let property = properties[propertyName]
-      let nestedProps = getNestedProps({ property })
-      if (nestedProps) {
-        for (let sub in nestedProps) {
-          let nestedPropertyName = getNestedPropertyName(propertyName, sub)
-          values[nestedPropertyName] = { value: nestedPropertyName }
-        }
-      } else {
-        values[propertyName] = { value: propertyName }
-      }
+      fieldName = getFieldName(propertyName)
+      values[fieldName] = { value: fieldName }
     }
 
     return new GraphQLEnumType({
@@ -512,76 +464,48 @@ function createSchema ({ resolvers, objects, models }) {
     return !model.inlined
   }
 
-  function getFields ({ model, isInput }) {
-    const required = isInput ? [] : getRequiredProperties(model)
+  function isNestedProperty (propertyName) {
+    return propertyName.indexOf('.') !== -1
+  }
+
+  function getFields ({ model, operator }) {
+    const required = operator ? [] : getRequiredProperties(model)
     const { properties } = model
-    const propertyNames = getProperties(model)
     const fields = {}
-    if (!isInput && isNodeModel(model)) {
-      fields.id = GraphQLRelay.globalIdField(model.id, getPrimaryKey)
-    }
+    const isInput = !!operator
+    const propertyNames = getProperties(model)
+      .filter(propertyName => {
+        // only allow nested on input types
+        if (!isInput && isNestedProperty(propertyName)) {
+          return
+        }
+
+        return !isInput ||
+          // operators with type 'any' can compare both objects and scalars
+          OPERATORS[operator].type === 'any' ||
+          isScalarProperty(properties[propertyName])
+      })
 
     propertyNames.forEach(propertyName => {
-      let field
       const property = properties[propertyName]
-      fields[propertyName] = createField({
+      fields[getFieldName(propertyName)] = createField({
         propertyName,
         property,
         model,
         required,
-        isInput
+        operator
       })
-
-      if (!isInput) return
-
-      const nestedProps = getNestedProps({ property })
-      if (!nestedProps) return
-
-      for (let p in nestedProps) {
-        let nestedPropertyName = getNestedPropertyName(propertyName, p)
-        let field = createField({
-          propertyName: nestedPropertyName,
-          property: nestedProps[p],
-          model,
-          // model: {
-          //   properties:
-          // },
-          isInput
-        })
-
-        fields[nestedPropertyName] = field
-
-        // let prop = shallowClone(nestedProps[p])
-        // prop.nested = true
-        // properties[`${propertyName}.${p}`] = prop
-      }
-
     })
+
+    if (!isInput && isNodeModel(model)) {
+      fields.id = GraphQLRelay.globalIdField(model.id, getPrimaryKey)
+    }
 
     return fields
   }
 
-  const getNestedPropertyName = function getNestedPropertyName (...parts) {
-    return parts.join(NESTED_PROP_SEPARATOR)
-  }
-
-  const getNestedProps = function ({ property }) {
-    if (property.type !== 'object' ||
-      property.range === 'json') {
-      return
-    }
-
-    if (isInlinedProperty({ models, property })) {
-      const ref = getRef(property)
-      if (ref === 'tradle.Model') return
-
-      return ref
-        ? models[ref].properties
-        : property.properties || property.items.properties
-
-    }
-
-    return ResourceStubProps
+  function getFieldName (propertyName) {
+    return propertyName.split('.').join(NESTED_PROP_SEPARATOR)
   }
 
   const createField = cachify(function ({
@@ -589,7 +513,6 @@ function createSchema ({ resolvers, objects, models }) {
     property,
     model,
     required=[],
-    isInput,
     operator
   }) {
     const { description } = property
@@ -598,7 +521,7 @@ function createSchema ({ resolvers, objects, models }) {
       property,
       model,
       isRequired: required.indexOf(propertyName) !== -1,
-      isInput
+      operator
     })
 
     const field = { type }
@@ -609,9 +532,8 @@ function createSchema ({ resolvers, objects, models }) {
   }, ({
     model,
     propertyName,
-    isInput,
     operator
-  }) => `${isInput ? 'i' : 'o'}~${model.id}~${propertyName}~${operator||''}`)
+  }) => `${operator ? 'i' : 'o'}~${model.id}~${propertyName}~${operator||''}`)
 
   function getFieldType (propertyInfo) {
     const { property, isRequired } = propertyInfo
@@ -623,7 +545,7 @@ function createSchema ({ resolvers, objects, models }) {
     return { type, resolve }
   }
 
-  function _getFieldType ({ propertyName, property, model, isRequired, isInput }) {
+  function _getFieldType ({ propertyName, property, model, isRequired, operator }) {
     const { type, range } = property
     if (range === 'json') {
       return { type: GraphQLJSON }
@@ -645,14 +567,14 @@ function createSchema ({ resolvers, objects, models }) {
           model,
           propertyName,
           property,
-          isInput
+          operator
         })
       case 'array':
         return getArrayValueType({
           model,
           propertyName,
           property,
-          isInput
+          operator
         })
       case 'enum':
         return { type: GraphQLString }
@@ -666,7 +588,7 @@ function createSchema ({ resolvers, objects, models }) {
   }
 
   function getArrayValueType (opts) {
-    const { model, propertyName, property, isInput } = opts
+    const { model, propertyName, property, operator } = opts
     if (getRef(property)) {
       // backlink or array of forward links
       return getRefType(opts)
@@ -680,7 +602,7 @@ function createSchema ({ resolvers, objects, models }) {
             id: model.id + '_' + propertyName,
             properties: property.items.properties
           },
-          isInput
+          operator
         }))
       }
     }
@@ -691,7 +613,7 @@ function createSchema ({ resolvers, objects, models }) {
         model,
         propertyName,
         property: property.items,
-        isInput
+        operator
       }).type)
     }
   }
@@ -720,12 +642,6 @@ function createSchema ({ resolvers, objects, models }) {
       getInstantiableModels(models).forEach(id => {
         const model = models[id]
         const type = getType({ model })
-        // fields[getListerFieldName(id)] = {
-        //   type: new GraphQLList(type),
-        //   args: getArgs({ model }),//  getType({ model, isInput: true }),
-        //   resolve: getLister({ model })
-        // }
-
         fields[getGetterFieldName(id)] = {
           type,
           args: primaryKeyArgs,
@@ -785,7 +701,7 @@ function createSchema ({ resolvers, objects, models }) {
     })
   })
 
-  function getRefType ({ propertyName, property, model, isInput }) {
+  function getRefType ({ propertyName, property, model, operator }) {
     const ref = getRef(property)
     const range = models[ref]
     if (!range) {
@@ -793,10 +709,14 @@ function createSchema ({ resolvers, objects, models }) {
     }
 
     if (range.subClassOf === 'tradle.Enum') {
-      return { type: getEnumType({ model: range, isInput }) }
+      return { type: getEnumType({ model: range, operator }) }
     }
 
-    if (isInput) {
+    if (operator) {
+      if (range.inlined) {
+        return { type: getType({ model: range, operator }) }
+      }
+
       return { type: ResourceStubType.input }
     }
 
@@ -857,9 +777,25 @@ function cachifyByModel (fn, cache={}) {
   return cachify(fn, ({ model }) => model.id, cache)
 }
 
+function cachifyByModelAndOperatorType (fn, cache={}) {
+  return cachify(fn, ({ model, operator }) => {
+    let operatorType = 'n/a'
+    if (operator) {
+      if (OPERATORS[operator].scalar) {
+        operatorType = 'scalar'
+      } else {
+        operatorType = 'any'
+      }
+    }
+
+    return `${operatorType}~${model.id}`
+  }, cache)
+}
+
 function cachifyByModelAndInput (fn, cache={}) {
-  return cachify(fn, ({ model, isInput }) => {
-    return `${isInput ? 'i' : 'o'}~${model.id}`
+  return cachify(fn, ({ model, operator }) => {
+    // i for input, o for output
+    return `${operator ? 'i' : 'o'}~${model.id}`
   }, cache)
 }
 
