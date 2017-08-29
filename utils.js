@@ -11,7 +11,7 @@ const {
 
 const { TYPE } = require('@tradle/constants')
 const {
-  isInlinedProperty,
+  // isInlinedProperty,
   parseId,
   setVirtual,
   isInstantiable
@@ -318,7 +318,7 @@ function getTypeName ({ model, type, isInput }) {
  */
 function normalizeNestedProps ({ args, model, models }) {
   const { properties } = model
-  const { filter } = args
+  const { filter, orderBy } = args
   for (let comparator in filter) {
     let vals = filter[comparator]
     Object.keys(vals).forEach(propertyName => {
@@ -329,6 +329,12 @@ function normalizeNestedProps ({ args, model, models }) {
         delete vals[propertyName]
       }
     })
+  }
+
+  if (orderBy) {
+    orderBy.property = orderBy.property
+      .split(NESTED_PROP_SEPARATOR)
+      .join('.')
   }
 }
 

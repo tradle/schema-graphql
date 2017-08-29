@@ -491,6 +491,12 @@ function createSchema ({ resolvers, objects, models }) {
     const { properties } = model
     for (let propertyName in properties) {
       values[propertyName] = { value: propertyName }
+      let property = properties[propertyName]
+      let nestedProps = getNestedProps({ property })
+      for (let sub in nestedProps) {
+        let nestedPropertyName = getNestedPropertyName(propertyName, sub)
+        values[nestedPropertyName] = { value: nestedPropertyName }
+      }
     }
 
     return new GraphQLEnumType({
@@ -523,27 +529,11 @@ function createSchema ({ resolvers, objects, models }) {
         isInput
       })
 
-      if (!isInput ||
-        property.type !== 'object' ||
-        property.range === 'json') {
-        return
-      }
+      if (!isInput) return
 
-      let nestedProps
-      if (isInlinedProperty({ models, property })) {
-        const ref = getRef(property)
-        if (ref === 'tradle.Model') return
-
-        nestedProps = ref
-          ? models[ref].properties
-          : property.properties || property.items.properties
-
-      } else {
-        nestedProps = ResourceStubProps
-      }
-
+      const nestedProps = getNestedProps({ property })
       for (let p in nestedProps) {
-        let nestedPropertyName = `${propertyName}${NESTED_PROP_SEPARATOR}${p}`
+        let nestedPropertyName = getNestedPropertyName(propertyName, p)
         let field = createField({
           propertyName: nestedPropertyName,
           property: nestedProps[p],
@@ -564,6 +554,29 @@ function createSchema ({ resolvers, objects, models }) {
     })
 
     return fields
+  }
+
+  const getNestedPropertyName = function getNestedPropertyName (...parts) {
+    return parts.join(NESTED_PROP_SEPARATOR)
+  }
+
+  const getNestedProps = function ({ property }) {
+    if (property.type !== 'object' ||
+      property.range === 'json') {
+      return {}
+    }
+
+    if (isInlinedProperty({ models, property })) {
+      const ref = getRef(property)
+      if (ref === 'tradle.Model') return
+
+      return ref
+        ? models[ref].properties
+        : property.properties || property.items.properties
+
+    }
+
+    return ResourceStubProps
   }
 
   const createField = cachify(function ({
@@ -606,7 +619,6 @@ function createSchema ({ resolvers, objects, models }) {
   }
 
   function _getFieldType ({ propertyName, property, model, isRequired, isInput }) {
-    if (propertyName === 'typeOfCoverage') debugger
     const { type, range } = property
     if (range === 'json') {
       return { type: GraphQLJSON }
