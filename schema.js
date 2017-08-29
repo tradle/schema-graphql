@@ -353,10 +353,15 @@ function createSchema ({ resolvers, objects, models }) {
 
   function getInterfaces ({ model, isInput }) {
     const { interfaces=[] } = model
-    return interfaces.filter(isGoodInterface).map(type => {
+    const myInterfaces = interfaces.filter(isGoodInterface).map(type => {
       return getType({ model: models[type], isInput })
     })
-    .concat(nodeInterface)
+
+    if (isNodeModel(model)) {
+      myInterfaces.push(nodeInterface)
+    }
+
+    return myInterfaces
   }
 
   const getOperatorFields = cachifyByModel(function ({ model }) {
@@ -494,12 +499,16 @@ function createSchema ({ resolvers, objects, models }) {
     })
   })
 
+  function isNodeModel (model) {
+    return !model.inlined
+  }
+
   function getFields ({ model, isInput }) {
     const required = isInput ? [] : getRequiredProperties(model)
     const { properties } = model
     const propertyNames = getProperties(model)
     const fields = {}
-    if (!isInput) {
+    if (!isInput && isNodeModel(model)) {
       fields.id = GraphQLRelay.globalIdField(model.id, getPrimaryKey)
     }
 
