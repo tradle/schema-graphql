@@ -126,7 +126,7 @@ function addProtocolProps (model) {
   if (model.inlined) {
     model.properties[TYPE] =  clone(BaseObjectModel.properties[TYPE])
     if (BaseObjectModel.required.includes(TYPE)) {
-      model.required = model.required.concat(TYPE)
+      model.required = required.concat(TYPE)
     }
   } else {
     extend(model.properties, clone(BaseObjectModel.properties))
