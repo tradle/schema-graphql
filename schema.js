@@ -69,6 +69,7 @@ const getCreaterFieldName = type => `c_${getTypeName({ type })}`
 const getUpdaterFieldName = type => `u_${getTypeName({ type })}`
 const getDeleterFieldName = type => `d_${getTypeName({ type })}`
 const BaseObjectModel = require('./object-model')
+const IDENTITY_FN = value => value
 
 function createSchema ({ resolvers, objects, models }) {
   const TYPES = {}
@@ -597,7 +598,7 @@ function createSchema ({ resolvers, objects, models }) {
     if (property.items.properties) {
       // inlined type unique to this model
       return {
-        type: new GraphQLList(getType({
+        type: toListType(getType({
           model: {
             id: model.id + '_' + propertyName,
             properties: property.items.properties
@@ -609,7 +610,7 @@ function createSchema ({ resolvers, objects, models }) {
 
     // array of a primitive type
     return {
-      type: new GraphQLList(getFieldType({
+      type: toListType(getFieldType({
         model,
         propertyName,
         property: property.items,
@@ -712,31 +713,28 @@ function createSchema ({ resolvers, objects, models }) {
       return { type: getEnumType({ model: range, operator }) }
     }
 
-    if (operator) {
-      if (range.inlined) {
+    const maybeToList = property.type === 'array' ? toListType : IDENTITY_FN
+    if (isInlinedProperty({ models, property })) {
+      if (isInstantiable(range)) {
         return { type: getType({ model: range, operator }) }
       }
 
+      // ideally we would want to return a json with _t required
+      // and an arbitrary set of other props
+      return { type: GraphQLJSON }
+    }
+
+    // input
+    if (operator) {
       return { type: ResourceStubType.input }
     }
 
+    // output
     // e.g. interface or abstract class
     if (!isInstantiable(range)) {
-      if (isGoodInterface(range.id)) {
-        return { type: GraphQLJSON }
-      }
-
-      debug(`not sure how to handle property with range ${ref}`)
+      debug(`not sure how to handle property ${model.id}.${propertyName} with range ${ref}`)
       return {
-        type: getType({ model: range }),
-        // resolve: IDENTITY_FN
-      }
-      // return { type: GraphQLJSON }
-    }
-
-    if (isInlinedProperty({ models, property })) {
-      return {
-        type: getType({ model: range })
+        type: maybeToList(ResourceStubType.output)
       }
     }
 
@@ -747,7 +745,7 @@ function createSchema ({ resolvers, objects, models }) {
         ret.resolve = getBacklinkResolver({ model: range })
         ret.args = getConnectionArgs({ model: range })
       } else {
-        ret.type = new GraphQLList(ResourceStubType.output)
+        ret.type = toListType(ResourceStubType.output)
       }
     } else {
       ret.type = ResourceStubType.output
@@ -805,7 +803,7 @@ function alwaysTrue () {
 
 function isGoodInterface (id) {
   return USE_INTERFACES &&
-    id !== 'tradle.Message' &&
+    id !== 'tradle.ChatItem' &&
     id !== 'tradle.Document'
 }
 
@@ -829,6 +827,10 @@ function idToPrimaryKey (id) {
 
 function firstPropertyValue (obj) {
   for (let key in obj) return obj[key]
+}
+
+function toListType (type) {
+  return new GraphQLList(type)
 }
 
 module.exports = createSchema
