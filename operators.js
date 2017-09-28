@@ -5,6 +5,9 @@ module.exports = {
   NEQ: {
     type: 'any'
   },
+  NULL: {
+    type: 'any'
+  },
   IN: {
     type: 'array'
   },

@@ -385,6 +385,13 @@ function createSchema ({ resolvers, objects, models }) {
           }
         }
 
+        const NULL = getNullOperatorField({ model })
+        if (NULL) {
+          fields.NULL = {
+            type: NULL
+          }
+        }
+
         OPERATOR_NAMES.forEach(operator => {
           if (!fields[operator]) {
             fields[operator] = {
@@ -398,7 +405,29 @@ function createSchema ({ resolvers, objects, models }) {
     })
   })
 
-  const getSelectorOperatorField = cachify(function ({ model, operator }) {
+  const getNullOperatorField = cachifyByModelAndOperator(function ({ model, operator='NULL' }) {
+    const { properties } = model
+    const required = getRequiredProperties(model)
+    // exclude "required" as they are required to be not null
+    const propertyNames = getProperties(model)
+      .filter(propertyName => !required.includes(propertyName))
+
+    if (!propertyNames.length) return
+
+    return new GraphQLInputObjectType({
+      name: `${operator}_${getTypeName({ model })}`,
+      fields: () => {
+        const fields = {}
+        propertyNames.forEach(propertyName => {
+          fields[getFieldName(propertyName)] = { type: GraphQLBoolean }
+        })
+
+        return fields
+      }
+    })
+  })
+
+  const getSelectorOperatorField = cachifyByModelAndOperator(function ({ model, operator }) {
     const { properties } = model
     const propertyNames = getProperties(model)
     return new GraphQLInputObjectType({
@@ -430,7 +459,7 @@ function createSchema ({ resolvers, objects, models }) {
         return fields
       }
     })
-  }, ({ model, operator }) => `${model.id}~${operator}`)
+  })
 
   const getOrderByField = function getOrderByField ({ model }) {
     return new GraphQLInputObjectType({
@@ -787,6 +816,12 @@ function cachifyByModelAndOperatorType (fn, cache={}) {
     }
 
     return `${operatorType}~${model.id}`
+  }, cache)
+}
+
+function cachifyByModelAndOperator (fn, cache={}) {
+  return cachify(fn, ({ model, operator }) => {
+    return `${model.id}~${operator}`
   }, cache)
 }
 
