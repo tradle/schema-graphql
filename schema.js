@@ -225,7 +225,7 @@ function createSchema ({ resolvers, objects, models }) {
     }
 
     const fields = graphqlFields(info)
-    opts.select = omit(fields.edges.node, ['id'])
+    opts.select = Object.keys(fields.edges.node).filter(prop => prop !== 'id')
     opts.limit = first
     opts.orderBy = orderBy
     opts.filter = filter
