@@ -51,7 +51,7 @@ const {
 
 const USE_INTERFACES = false
 const TYPE = '_t'
-const primaryKeys = ['_link']
+const primaryKeys = ['_permalink']
 const { TimestampType, BytesType, ResourceStubType } = require('./types')
 const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
 const StringWrapper = { type: GraphQLString }
@@ -853,11 +853,11 @@ function positionFromCursor (cursor) {
 }
 
 function getPrimaryKey (item) {
-  return item._link
+  return item._permalink
 }
 
 function idToPrimaryKey (id) {
-  return { _link: id }
+  return { _permalink: id }
 }
 
 function firstPropertyValue (obj) {
