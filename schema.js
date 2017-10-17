@@ -19,7 +19,8 @@ const graphqlFields = require('graphql-fields')
 const {
   isInlinedProperty,
   isInstantiable,
-  isEnum
+  isEnum,
+  parseStub
 } = require('@tradle/validate-resource').utils
 const buildResource = require('@tradle/build-resource')
 const OPERATORS = require('./operators')
@@ -51,7 +52,7 @@ const {
 
 const USE_INTERFACES = false
 const TYPE = '_t'
-const primaryKeys = ['_permalink']
+const linkProps = ['_link', '_permalink']
 const { TimestampType, BytesType, ResourceStubType } = require('./types')
 const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
 const StringWrapper = { type: GraphQLString }
@@ -79,7 +80,7 @@ function createSchema ({ resolvers, objects, models }) {
     globalId => {
       const { type, id } = GraphQLRelay.fromGlobalId(globalId)
       const model = getModel(type)
-      const key = idToPrimaryKey(id)
+      const key = idToGlobalId(id)
       return resolvers.get({ model, key })
     },
     obj => {
@@ -162,21 +163,22 @@ function createSchema ({ resolvers, objects, models }) {
         return getByStub({ model, stub: props })
       }
 
-      return getByPrimaryKey({ model, props })
+      if (props._link) {
+        return resolvers.getByLink(props._link)
+      }
+
+      return getByLinks({ model, props })
     })
   }, TYPES)
 
   function getByStub ({ model, stub }) {
-    return getByPrimaryKey({
-      model,
-      props: fromResourceStub(stub)
-    })
+    return resolvers.getByLink(parseStub(stub).link)
   }
 
-  const getByPrimaryKey = co(function* ({ model, key, props }) {
-    if (!key) key = pick(props, primaryKeys)
+  const getByLinks = co(function* ({ model, key, props }) {
+    if (!key) key = pick(props, linkProps)
 
-    if (typeof key === 'object' && primaryKeys.length === 1) {
+    if (typeof key === 'object' && linkProps.length === 1) {
       key = firstPropertyValue(key)
     }
 
@@ -258,13 +260,13 @@ function createSchema ({ resolvers, objects, models }) {
     }
   }
 
-  const getLinkResolver = cachifyByModel(function ({ model }) {
-    return function (source, args, context, info) {
-      const { fieldName } = info
-      const stub = source[fieldName]
-      return getByStub({ model, stub })
-    }
-  })
+  // const getLinkResolver = cachifyByModel(function ({ model }) {
+  //   return function (source, args, context, info) {
+  //     const { fieldName } = info
+  //     const stub = source[fieldName]
+  //     return getByStub({ model, stub })
+  //   }
+  // })
 
   const getLister = cachifyByModel(function ({ model }) {
     return (source, args, context, info) => {
@@ -480,7 +482,7 @@ function createSchema ({ resolvers, objects, models }) {
     const { properties } = model
     for (let propertyName in properties) {
       let property = properties[propertyName]
-      fieldName = getFieldName(propertyName)
+      let fieldName = getFieldName(propertyName)
       values[fieldName] = { value: fieldName }
     }
 
@@ -528,7 +530,7 @@ function createSchema ({ resolvers, objects, models }) {
     })
 
     if (!isInput && isNodeModel(model)) {
-      fields.id = GraphQLRelay.globalIdField(model.id, getPrimaryKey)
+      fields.id = GraphQLRelay.globalIdField(model.id, getGlobalId)
     }
 
     return fields
@@ -674,7 +676,7 @@ function createSchema ({ resolvers, objects, models }) {
         const type = getType({ model })
         fields[getGetterFieldName(id)] = {
           type,
-          args: primaryKeyArgs,
+          args: linkPropsArgs,
           resolve: getGetter({ model })
         }
 
@@ -787,7 +789,7 @@ function createSchema ({ resolvers, objects, models }) {
 
   const basePropsTypes = getFields({ model: BaseObjectModel })
   // const basePropsArgs = toNonNull(basePropsTypes)
-  const primaryKeyArgs = toNonNull(pick(basePropsTypes, primaryKeys))
+  const linkPropsArgs = pick(basePropsTypes, linkProps)
   const schema = new GraphQLSchema({
     query: QueryType,
     // mutation: MutationType,
@@ -852,11 +854,11 @@ function positionFromCursor (cursor) {
   // return GraphQLRelay.fromGlobalId(globalId).id
 }
 
-function getPrimaryKey (item) {
+function getGlobalId (item) {
   return item._permalink
 }
 
-function idToPrimaryKey (id) {
+function idToGlobalId (id) {
   return { _permalink: id }
 }
 

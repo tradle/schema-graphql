@@ -18,7 +18,7 @@ const {
 } = require('@tradle/validate-resource').utils
 const { ResourceStubType } = require('./types')
 const BaseObjectModel = require('./object-model')
-const ObjectPropNames = Object.keys(BaseObjectModel.properties)
+// const ObjectPropNames = Object.keys(BaseObjectModel.properties)
 const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
 
 module.exports = {
@@ -124,7 +124,7 @@ function addProtocolProps (model) {
   }
 
   if (model.inlined) {
-    model.properties[TYPE] =  clone(BaseObjectModel.properties[TYPE])
+    model.properties[TYPE] = clone(BaseObjectModel.properties[TYPE])
     if (BaseObjectModel.required.includes(TYPE)) {
       model.required = required.concat(TYPE)
     }
