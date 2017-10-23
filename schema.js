@@ -740,14 +740,18 @@ function createSchema ({ resolvers, objects, models }) {
       return { type: GraphQLJSON }
     }
 
+    const maybeToList = property.type === 'array' ? toListType : IDENTITY_FN
     if (range.subClassOf === 'tradle.Enum') {
-      return { type: getEnumType({ model: range, operator }) }
+      return {
+        type: maybeToList(getEnumType({ model: range, operator }))
+      }
     }
 
-    const maybeToList = property.type === 'array' ? toListType : IDENTITY_FN
     if (isInlinedProperty({ models, property })) {
       if (isInstantiable(range)) {
-        return { type: getType({ model: range, operator }) }
+        return {
+          type: maybeToList(getType({ model: range, operator }))
+        }
       }
 
       // ideally we would want to return a json with _t required
