@@ -81,7 +81,7 @@ function createSchema ({ resolvers, objects, models }) {
       const { type, id } = GraphQLRelay.fromGlobalId(globalId)
       const model = getModel(type)
       const key = idToGlobalId(id)
-      return resolvers.get({ model, key })
+      return getByKey({ model, key })
     },
     obj => {
       const model = getModel(obj[TYPE])
@@ -167,7 +167,7 @@ function createSchema ({ resolvers, objects, models }) {
         return resolvers.getByLink(props._link)
       }
 
-      return getByLinks({ model, props })
+      return getByKey({ model, key: props })
     })
   }, TYPES)
 
@@ -175,14 +175,9 @@ function createSchema ({ resolvers, objects, models }) {
     return resolvers.getByLink(parseStub(stub).link)
   }
 
-  const getByLinks = co(function* ({ model, key, props }) {
-    if (!key) key = pick(props, linkProps)
-
-    if (typeof key === 'object' && linkProps.length === 1) {
-      key = firstPropertyValue(key)
-    }
-
+  const getByKey = co(function* ({ model, key }) {
     // TODO: add ProjectionExpression with attributes to fetch
+    key[TYPE] = model.id
     return resolvers.get({ model, key })
   })
 
