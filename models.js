@@ -1,8 +1,4 @@
-const modelsArray = require('@tradle/models').models.concat(require('@tradle/custom-models'))
-const { normalizeModels } = require('./utils')
-const models = normalizeModels(modelsArray.reduce((map, model) => {
-  map[model.id] = model
-  return map
-}, {}))
-
-module.exports = models
+module.exports = require('@tradle/merge-models')()
+  .add(require('@tradle/models').models, { validate: false })
+  .add(require('@tradle/custom-models'), { validate: false })
+  .get()

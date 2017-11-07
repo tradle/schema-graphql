@@ -75,7 +75,6 @@ const IDENTITY_FN = value => value
 function createSchema ({ resolvers, objects, models }) {
   const TYPES = {}
   models = normalizeModels(models)
-
   const { nodeInterface, nodeField } = GraphQLRelay.nodeDefinitions(
     globalId => {
       const { type, id } = GraphQLRelay.fromGlobalId(globalId)
@@ -96,7 +95,7 @@ function createSchema ({ resolvers, objects, models }) {
   }
 
   // function createMutationType ({ model }) {
-  //   const required = getRequiredProperties(model)
+  //   const required = getRequiredProperties({ model })
   //   const { properties } = model
   //   const propertyNames = getOnCreateProperties({ model, models })
   //   const { id } = model
@@ -291,7 +290,7 @@ function createSchema ({ resolvers, objects, models }) {
     return operator ? ResourceStubType.input : ResourceStubType.output
   }
 
-  const getType = cachifyByModelAndOperatorType(function ({ model, operator }) {
+  const getType = cachify(function ({ model, operator, inlined }) {
     if (isEnum(model)) {
       return getEnumType({ model, operator })
     }
@@ -307,11 +306,13 @@ function createSchema ({ resolvers, objects, models }) {
     }
 
     return new ctor({
-      name: getTypeName({ model, operator }),
+      name: getTypeName({ model, operator, inlined }),
       description: model.description,
       interfaces: getInterfaces({ model, operator }),
-      fields: () => getFields({ model, operator })
+      fields: () => getFields({ model, operator, inlined })
     })
+  }, ({ model, operator, inlined }) => {
+    return [model.id, getOperatorType(operator), getInlinedMarker(inlined)].join('~')
   })
 
   const getConnectionType = ({ model }) =>
@@ -404,7 +405,7 @@ function createSchema ({ resolvers, objects, models }) {
 
   const getNullOperatorField = cachifyByModelAndOperator(function ({ model, operator='NULL' }) {
     const { properties } = model
-    const required = getRequiredProperties(model)
+    const required = getRequiredProperties({ model })
     // exclude "required" as they are required to be not null
     const propertyNames = getProperties(model)
       .filter(propertyName => !required.includes(propertyName))
@@ -495,8 +496,8 @@ function createSchema ({ resolvers, objects, models }) {
     return propertyName.indexOf('.') !== -1
   }
 
-  function getFields ({ model, operator }) {
-    const required = operator ? [] : getRequiredProperties(model)
+  function getFields ({ model, operator, inlined }) {
+    const required = operator ? [] : getRequiredProperties({ model, inlined })
     const { properties } = model
     const fields = {}
     const isInput = !!operator
@@ -745,7 +746,7 @@ function createSchema ({ resolvers, objects, models }) {
     if (isInlinedProperty({ models, property })) {
       if (isInstantiable(range)) {
         return {
-          type: maybeToList(getType({ model: range, operator }))
+          type: maybeToList(getType({ model: range, operator, inlined: true }))
         }
       }
 
@@ -801,22 +802,30 @@ function createSchema ({ resolvers, objects, models }) {
   }
 }
 
+function getOperatorType (operator) {
+  let operatorType = 'n/a'
+  if (operator) {
+    if (OPERATORS[operator].scalar) {
+      operatorType = 'scalar'
+    } else {
+      operatorType = 'any'
+    }
+  }
+
+  return operatorType
+}
+
+function getInlinedMarker (inlined) {
+  return inlined ? 'in' : 'out'
+}
+
 function cachifyByModel (fn, cache={}) {
   return cachify(fn, ({ model }) => model.id, cache)
 }
 
 function cachifyByModelAndOperatorType (fn, cache={}) {
   return cachify(fn, ({ model, operator }) => {
-    let operatorType = 'n/a'
-    if (operator) {
-      if (OPERATORS[operator].scalar) {
-        operatorType = 'scalar'
-      } else {
-        operatorType = 'any'
-      }
-    }
-
-    return `${operatorType}~${model.id}`
+    return `${getOperatorType(operator)}~${model.id}`
   }, cache)
 }
 

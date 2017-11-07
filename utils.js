@@ -18,6 +18,7 @@ const {
 } = require('@tradle/validate-resource').utils
 const { ResourceStubType } = require('./types')
 const BaseObjectModel = require('./object-model')
+const BASE_REQUIRED_INLINED = [TYPE]
 // const ObjectPropNames = Object.keys(BaseObjectModel.properties)
 const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
 
@@ -130,13 +131,11 @@ function addProtocolProps (model) {
 
   if (model.inlined) {
     model.properties[TYPE] = clone(BaseObjectModel.properties[TYPE])
-    if (BaseObjectModel.required.includes(TYPE)) {
-      model.required = required.concat(TYPE)
-    }
   } else {
     extend(model.properties, clone(BaseObjectModel.properties))
-    model.required = unique(required.concat(BaseObjectModel.required || []))
   }
+
+  model.required = getRequiredProperties({ model, inlined: model.inlined })
 }
 
 function expandGroupProps (model, arr) {
@@ -164,6 +163,13 @@ function unique (strings) {
 
 // function hasNonProtocolProps (model) {
 //   return !!Object.keys(omit(model.properties, PROTOCOL_PROP_NAMES)).length
+// }
+
+// function toInlinedModel (model) {
+//   return shallowClone(model, {
+//     inlined: true,
+//     required: getRequiredProperties({ model, inlined })
+//   })
 // }
 
 function normalizeModels (models) {
@@ -220,8 +226,15 @@ function addNestedProps (model, models) {
   return model
 }
 
-function getRequiredProperties (model) {
-  return model.required || []
+function getRequiredProperties ({ model, inlined }) {
+  let required = model.required || []
+  if (inlined) {
+    required = required.concat(BASE_REQUIRED_INLINED)
+  } else {
+    required = required.concat(BaseObjectModel.required)
+  }
+
+  return unique(required)
 }
 
 function getRef (property) {
@@ -294,21 +307,22 @@ function lazy (fn) {
   }
 }
 
-function getTypeName ({ model, type, operator }) {
+function getTypeName ({ model, type, operator, inlined }) {
   if (!type) {
     type = model.id
   }
 
-  const base = type.replace(/[^_a-zA-Z0-9]/g, '_')
+  let name = type.replace(/[^_a-zA-Z0-9]/g, '_')
 
   // graphql constraint
-  if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(base)) {
+  if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) {
     throw new Error('unable to sanitize type name: ' + type)
   }
 
-  if (operator) return `${operator}_${base}`
+  if (operator) name = `${operator}_${name}`
+  if (inlined) name = `${name}_i`
 
-  return base
+  return name
 }
 
 /**
