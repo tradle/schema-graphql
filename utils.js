@@ -113,6 +113,11 @@ function isScalarProperty (property) {
 // }
 
 function addProtocolProps (model) {
+  if (model.id === 'tradle.Seal') {
+    debug('not adding protocol props to tradle.Seal model')
+    return
+  }
+
   let required = model.required || []
   while (true) {
     let expanded = expandGroupProps(model, required)
