@@ -306,13 +306,17 @@ function createSchema ({ resolvers, objects, models }) {
     }
 
     return new ctor({
-      name: getTypeName({ model, operator, inlined }),
+      name: getTypeName({
+        model,
+        operatorType: operator && getOperatorType(operator),
+        inlined
+      }),
       description: model.description,
       interfaces: getInterfaces({ model, operator }),
       fields: () => getFields({ model, operator, inlined })
     })
   }, ({ model, operator, inlined }) => {
-    return [model.id, getOperatorType(operator), getInlinedMarker(inlined)].join('~')
+    return [model.id, getOperatorType(operator) || '', getInlinedMarker(inlined)].join('~')
   })
 
   const getConnectionType = ({ model }) =>
@@ -803,16 +807,13 @@ function createSchema ({ resolvers, objects, models }) {
 }
 
 function getOperatorType (operator) {
-  let operatorType = 'n/a'
   if (operator) {
     if (OPERATORS[operator].scalar) {
-      operatorType = 'scalar'
-    } else {
-      operatorType = 'any'
+      return 'scalar_compare'
     }
-  }
 
-  return operatorType
+    return 'compare'
+  }
 }
 
 function getInlinedMarker (inlined) {
@@ -825,7 +826,7 @@ function cachifyByModel (fn, cache={}) {
 
 function cachifyByModelAndOperatorType (fn, cache={}) {
   return cachify(fn, ({ model, operator }) => {
-    return `${getOperatorType(operator)}~${model.id}`
+    return `${getOperatorType(operator) || ''}~${model.id}`
   }, cache)
 }
 

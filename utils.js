@@ -307,7 +307,7 @@ function lazy (fn) {
   }
 }
 
-function getTypeName ({ model, type, operator, inlined }) {
+function getTypeName ({ model, type, operator, operatorType, inlined }) {
   if (!type) {
     type = model.id
   }
@@ -319,7 +319,10 @@ function getTypeName ({ model, type, operator, inlined }) {
     throw new Error('unable to sanitize type name: ' + type)
   }
 
-  if (operator) name = `${operator}_${name}`
+  if (operator || operatorType) {
+    name = `${operator || operatorType}_${name}`
+  }
+
   if (inlined) name = `${name}_i`
 
   return name
