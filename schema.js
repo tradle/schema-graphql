@@ -378,12 +378,16 @@ function createSchema ({ resolvers, objects, models }) {
     return new GraphQLInputObjectType({
       name: 'filter_' + getTypeName({ model }),
       fields: () => {
+        const selector = getSelectorOperatorField({ model, operator: 'IN' })
         const fields = {
           IN: {
-            type: getSelectorOperatorField({ model, operator: 'IN' })
+            type: selector
+          },
+          NOT_IN: {
+            type: selector
           },
           BETWEEN: {
-            type: getSelectorOperatorField({ model, operator: 'BETWEEN' })
+            type: selector
           }
         }
 
@@ -429,11 +433,11 @@ function createSchema ({ resolvers, objects, models }) {
     })
   })
 
-  const getSelectorOperatorField = cachifyByModelAndOperator(function ({ model, operator }) {
+  const getSelectorOperatorField = cachifyByModel(function ({ model, operator }) {
     const { properties } = model
     const propertyNames = getProperties(model)
     return new GraphQLInputObjectType({
-      name: `${operator}_${getTypeName({ model })}`,
+      name: `selector_${getTypeName({ model })}`,
       fields: () => {
         const fields = {}
         propertyNames.forEach(propertyName => {

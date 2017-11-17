@@ -8,6 +8,9 @@ module.exports = {
   NULL: {
     type: 'any'
   },
+  NOT_IN: {
+    type: 'array'
+  },
   IN: {
     type: 'array'
   },
