@@ -50,6 +50,7 @@ const {
   debug
 } = require('./utils')
 
+const { connectionArgs } = GraphQLRelay
 const USE_INTERFACES = false
 const TYPE = '_t'
 const linkProps = ['_link', '_permalink']
@@ -215,14 +216,14 @@ function createSchema ({ resolvers, objects, models }) {
 
   const fetchList = (opts) => {
     const { args, info } = opts
-    const { first, after, orderBy, filter } = args
-    if (after) {
-      opts.after = positionFromCursor(after)
+    const { first, last, limit, checkpoint, orderBy, filter } = args
+    if (checkpoint) {
+      opts.checkpoint = positionFromCursor(checkpoint)
     }
 
     const fields = graphqlFields(info)
     opts.select = Object.keys(fields.edges.node).filter(prop => prop !== 'id')
-    opts.limit = first
+    opts.limit = limit || first || last
     opts.orderBy = orderBy
     opts.filter = filter
     return resolvers.list(opts).then(result => {
@@ -241,15 +242,20 @@ function createSchema ({ resolvers, objects, models }) {
 
   const connectionToArray = (result, args) => {
     const { items, startPosition, endPosition, itemToPosition } = result
-    const { first, last, after } = args
+    const limit = args.limit || args.first || args.last
+    const checkpoint = args.checkpoint || args.before || args.after
+    const { orderBy } = args
     const edges = items.map(item => itemToEdge({ item, args, itemToPosition }))
+    const hasNextPage = !orderBy.desc && typeof limit === 'number' ? edges.length === limit : false
+    const hasPreviousPage = orderBy.desc && typeof limit === 'number' ? edges.length === limit : false
     return {
       edges,
       pageInfo: {
         startCursor: edges.length ? positionToCursor(startPosition) : null,
         endCursor: edges.length ? positionToCursor(endPosition) : null,
-        hasPreviousPage: typeof last === 'number' ? !!after : false,
-        hasNextPage: typeof first === 'number' ? edges.length === first : false
+        // hasPreviousPage: typeof last === 'number' ? !!after : false,
+        hasPreviousPage,
+        hasNextPage
       }
     }
   }
@@ -365,7 +371,7 @@ function createSchema ({ resolvers, objects, models }) {
         type: getFilterField({ model })
       },
       orderBy: {
-        type: getOrderByField({ model })
+        type: new GraphQLNonNull(getOrderByField({ model }))
       },
       // limit: {
       //   type: GraphQLInt
@@ -696,10 +702,10 @@ function createSchema ({ resolvers, objects, models }) {
   })
 
   const getConnectionArgs = cachifyByModel(({ model }) => {
-    return extend(
-      getArgs({ model }),
-      GraphQLRelay.connectionArgs
-    )
+    const cArgs = shallowClone(getArgs({ model }))
+    cArgs.limit = connectionArgs.first
+    cArgs.checkpoint = connectionArgs.after
+    return cArgs
   })
 
   // const createWrappedMutationType = function createWrappedMutationType ({ model }) {
