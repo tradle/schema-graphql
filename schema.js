@@ -702,7 +702,7 @@ function createSchema ({ resolvers, objects, models }) {
   })
 
   const getConnectionArgs = cachifyByModel(({ model }) => {
-    const cArgs = shallowClone(getArgs({ model }))
+    const cArgs = shallowClone(getArgs({ model }), connectionArgs)
     cArgs.limit = connectionArgs.first
     cArgs.checkpoint = connectionArgs.after
     return cArgs
