@@ -5,6 +5,7 @@ const shallowClone = require('xtend')
 const extend = require('xtend/mutable')
 const deepEqual = require('deep-equal')
 const clone = require('clone')
+const cloneNonCircular = obj => clone(obj, false)
 const {
   GraphQLNonNull,
 } = require('graphql/type')
@@ -130,24 +131,23 @@ function addProtocolProps (model) {
   }
 
   if (model.inlined) {
-    model.properties[TYPE] = clone(BaseObjectModel.properties[TYPE])
+    model.properties[TYPE] = cloneNonCircular(BaseObjectModel.properties[TYPE])
   } else {
-    extend(model.properties, clone(BaseObjectModel.properties))
+    extend(model.properties, cloneNonCircular(BaseObjectModel.properties))
   }
 
   model.required = getRequiredProperties({ model, inlined: model.inlined })
 }
 
 function expandGroupProps (model, arr) {
-  return arr.reduce((props, name) => {
+  const props = []
+  for (const name of arr) {
     const { group } = model.properties[name]
-    if (group) {
-      // nested group props should be caught in @tradle/validate-model
-      return props.concat(group)
-    }
+    // nested group props should be caught in @tradle/validate-model
+    props.push(group || name)
+  }
 
-    return props.concat(name)
-  }, [])
+  return props
 }
 
 function unique (strings) {
@@ -177,7 +177,7 @@ function normalizeModels (models) {
   //   return !isInstantiable(model) || hasNonProtocolProps(model)
   // })
 
-  models = clone(models)
+  models = cloneNonCircular(models)
   forEachPropIn(models, addProtocolProps, models)
   forEachPropIn(models, addCustomProps, models)
   forEachPropIn(models, addNestedProps, models)
