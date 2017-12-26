@@ -40,7 +40,7 @@ const {
   getRef,
   normalizeNestedProps,
   cachify,
-  toNonNull,
+  // toNonNull,
   getValues,
   shallowClone,
   extend,
@@ -72,6 +72,12 @@ const getUpdaterFieldName = type => `u_${getTypeName({ type })}`
 const getDeleterFieldName = type => `d_${getTypeName({ type })}`
 const BaseObjectModel = require('./object-model')
 const IDENTITY_FN = value => value
+const modelsVersionIdField = {
+  name: 'modelsVersionId',
+  field: {
+    type: GraphQLString
+  }
+}
 
 function createSchema ({ resolvers, objects, models }) {
   const TYPES = {}
@@ -373,6 +379,7 @@ function createSchema ({ resolvers, objects, models }) {
       orderBy: {
         type: new GraphQLNonNull(getOrderByField({ model }))
       },
+      [modelsVersionIdField.name]: modelsVersionIdField.field
       // limit: {
       //   type: GraphQLInt
       // }
@@ -678,7 +685,8 @@ function createSchema ({ resolvers, objects, models }) {
     name: 'Query',
     fields: () => {
       const fields = {
-        node: nodeField
+        node: nodeField,
+        [modelsVersionIdField.name]: modelsVersionIdField.field
       }
 
       getInstantiableModels(models).forEach(id => {
