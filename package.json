@@ -7,6 +7,7 @@
   "license": "MIT",
   "devDependencies": {
     "@tradle/custom-models": "https://github.com/tradle/custom-models",
+    "@tradle/engine": "^5.5.0",
     "@tradle/models": "github:tradle/models",
     "@tradle/validate-model": "^4.1.0",
     "@tradle/validate-resource": "^2.5.0",
@@ -20,21 +21,16 @@
     "prepush": "npm test"
   },
   "dependencies": {
-    "@tradle/build-resource": "^2.2.0",
+    "@tradle/build-resource": "^2.14.0",
     "@tradle/constants": "^2.1.0",
     "@tradle/merge-models": "^2.1.0",
-    "clone": "^2.1.1",
     "co": "^4.6.0",
     "debug": "^2.6.6",
-    "deep-equal": "^1.0.1",
     "graphql": "^0.10.4",
     "graphql-fields": "^1.0.2",
     "graphql-relay": "^0.5.2",
     "graphql-type-json": "^0.1.4",
-    "object.omit": "^2.0.1",
-    "object.pick": "^1.2.0",
-    "typeforce": "^1.11.1",
-    "xtend": "^4.0.1"
+    "typeforce": "^1.11.1"
   },
   "peerDependencies": {
     "@tradle/engine": "*",

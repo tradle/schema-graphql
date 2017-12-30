@@ -1,11 +1,5 @@
 const debug = require('debug')(require('./package').name)
-const pick = require('object.pick')
-const omit = require('object.omit')
-const shallowClone = require('xtend')
-const extend = require('xtend/mutable')
-const deepEqual = require('deep-equal')
-const clone = require('clone')
-const cloneNonCircular = obj => clone(obj, false)
+const _ = require('lodash')
 const {
   GraphQLNonNull,
 } = require('graphql/type')
@@ -25,12 +19,6 @@ const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
 
 module.exports = {
   debug,
-  pick,
-  omit,
-  shallowClone,
-  clone,
-  extend,
-  deepEqual,
   lazy,
   isResourceStub,
   isBadEnumModel,
@@ -40,14 +28,14 @@ module.exports = {
   normalizeModels,
   normalizeNestedProps,
   cachify,
-  getValues,
   toNonNull,
   getProperties,
   getRequiredProperties,
   getInstantiableModels,
   getRef,
   getTypeName,
-  fromResourceStub
+  fromResourceStub,
+  defineGetter
 }
 
 function cachify (fn, getId, cache={}) {
@@ -61,13 +49,9 @@ function cachify (fn, getId, cache={}) {
   }
 }
 
-function getValues (obj) {
-  return Object.keys(obj).map(key => obj[key])
-}
-
 function toNonNull (types) {
   return mapObject(types, wrapper => {
-    return shallowClone(wrapper, {
+    return _.extend({}, wrapper, {
       type: new GraphQLNonNull(wrapper.type)
     })
   })
@@ -76,7 +60,7 @@ function toNonNull (types) {
 function isResourceStub (props) {
   const keys = Object.keys(props)
   return keys.length === ResourceStubType.propertyNames &&
-    deepEqual(keys.sort(), ResourceStubType.propertyNames)
+    _.isEqual(keys.sort(), ResourceStubType.propertyNames)
 }
 
 function isComplexProperty ({ type, range }) {
@@ -131,9 +115,9 @@ function addProtocolProps (model) {
   }
 
   if (model.inlined) {
-    model.properties[TYPE] = cloneNonCircular(BaseObjectModel.properties[TYPE])
+    model.properties[TYPE] = _.cloneDeep(BaseObjectModel.properties[TYPE])
   } else {
-    extend(model.properties, cloneNonCircular(BaseObjectModel.properties))
+    _.extend(model.properties, _.cloneDeep(BaseObjectModel.properties))
   }
 
   model.required = getRequiredProperties({ model, inlined: model.inlined })
@@ -162,11 +146,11 @@ function unique (strings) {
 }
 
 // function hasNonProtocolProps (model) {
-//   return !!Object.keys(omit(model.properties, PROTOCOL_PROP_NAMES)).length
+//   return !!Object.keys(_.omit(model.properties, PROTOCOL_PROP_NAMES)).length
 // }
 
 // function toInlinedModel (model) {
-//   return shallowClone(model, {
+//   return _.extend({}, model, {
 //     inlined: true,
 //     required: getRequiredProperties({ model, inlined })
 //   })
@@ -177,7 +161,7 @@ function normalizeModels (models) {
   //   return !isInstantiable(model) || hasNonProtocolProps(model)
   // })
 
-  models = cloneNonCircular(models)
+  models = _.cloneDeep(models)
   forEachPropIn(models, addProtocolProps, models)
   forEachPropIn(models, addCustomProps, models)
   forEachPropIn(models, addNestedProps, models)
@@ -219,7 +203,7 @@ function addNestedProps (model, models) {
     }
 
     for (let p in nestedProps) {
-      properties[`${propertyName}.${p}`] = shallowClone(nestedProps[p])
+      properties[`${propertyName}.${p}`] = _.extend({}, nestedProps[p])
     }
   })
 
@@ -367,4 +351,10 @@ function fromResourceStub ({ id, title }) {
   })
 
   return resource
+}
+
+function defineGetter (obj, prop, getter) {
+  Object.defineProperty(obj, prop, {
+    get: getter
+  })
 }

@@ -1,4 +1,4 @@
-const pick = require('object.pick')
+const _ = require('lodash')
 const {
   GraphQLObjectType,
   GraphQLInputObjectType,
@@ -16,7 +16,7 @@ function parseLiteral (ast) {
     return props
   }, {})
 
-  return pick(stub, ['id', 'title'])
+  return _.pick(stub, ['id', 'title'])
 }
 
 const fields = {

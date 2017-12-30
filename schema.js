@@ -1,3 +1,4 @@
+const _ = require('lodash')
 const co = require('co').wrap
 const {
   GraphQLSchema,
@@ -41,13 +42,8 @@ const {
   normalizeNestedProps,
   cachify,
   // toNonNull,
-  getValues,
-  shallowClone,
-  extend,
-  pick,
-  omit,
-  clone,
-  debug
+  debug,
+  defineGetter
 } = require('./utils')
 
 const { connectionArgs } = GraphQLRelay
@@ -79,9 +75,11 @@ const modelsVersionIdField = {
   }
 }
 
-function createSchema ({ resolvers, objects, models }) {
+function createSchema (opts={}) {
+  const { resolvers, objects } = opts
+  const models = {}
+  const schemas = {}
   const TYPES = {}
-  models = normalizeModels(models)
   const { nodeInterface, nodeField } = GraphQLRelay.nodeDefinitions(
     globalId => {
       const { type, id } = GraphQLRelay.fromGlobalId(globalId)
@@ -276,14 +274,14 @@ function createSchema ({ resolvers, objects, models }) {
 
   const getLister = cachifyByModel(function ({ model }) {
     return (source, args, context, info) => {
-      args = clone(args)
+      args = _.cloneDeep(args)
       normalizeNestedProps({ model, args })
       return fetchList({ model, source, args, context, info })
     }
   })
 
   // function getPrimaryKeyProps (props) {
-  //   return pick(props, PRIMARY_KEY_PROPS)
+  //   return _.pick(props, PRIMARY_KEY_PROPS)
   // }
 
   // function sanitizeEnumValueName (id) {
@@ -461,7 +459,7 @@ function createSchema ({ resolvers, objects, models }) {
             const fieldName = getFieldName(propertyName)
             fields[fieldName] = createField({
               propertyName,
-              property: shallowClone(property, {
+              property: _.extend({}, property, {
                 type: 'array',
                 items: {
                   type: property.type
@@ -677,40 +675,9 @@ function createSchema ({ resolvers, objects, models }) {
     }
   })
 
-  /**
-   * This is the type that will be the root of our query,
-   * and the entry point into our schema.
-   */
-  const QueryType = new GraphQLObjectType({
-    name: 'Query',
-    fields: () => {
-      const fields = {
-        node: nodeField,
-        [modelsVersionIdField.name]: modelsVersionIdField.field
-      }
-
-      getInstantiableModels(models).forEach(id => {
-        const model = models[id]
-        const type = getType({ model })
-        fields[getGetterFieldName(id)] = {
-          type,
-          args: linkPropsArgs,
-          resolve: getGetter({ model })
-        }
-
-        fields[getConnectionFieldName(id)] = {
-          type: getConnectionType({ model }),
-          args: getConnectionArgs({ model }),
-          resolve: getLister({ model })
-        }
-      })
-
-      return fields
-    }
-  })
 
   const getConnectionArgs = cachifyByModel(({ model }) => {
-    const cArgs = shallowClone(getArgs({ model }), connectionArgs)
+    const cArgs = _.extend({}, getArgs({ model }), connectionArgs)
     cArgs.limit = connectionArgs.first
     cArgs.checkpoint = connectionArgs.after
     return cArgs
@@ -720,10 +687,10 @@ function createSchema ({ resolvers, objects, models }) {
   //   return new GraphQLInputObjectType({
   //     name: getTypeName({ model }),
   //     description: model.description,
-  //     fields: extend({
+  //     fields: _.extend({
   //       object: createMutationType({ model }),
   //     }, metadataTypes),
-  //     // args: () => extend({
+  //     // args: () => _.extend({
   //     //   object: createMutationType({ model }),
   //     // }, basePropsArgs)
   //   })
@@ -742,14 +709,6 @@ function createSchema ({ resolvers, objects, models }) {
   //     return fields
   //   }
   // })
-
-  const schemas = {}
-  Object.keys(models).forEach(id => {
-    // lazy
-    schemas.__defineGetter__(id, () => {
-      return getType({ model: models[id] })
-    })
-  })
 
   function getRefType ({ propertyName, property, model, operator }) {
     const ref = getRef(property)
@@ -811,16 +770,68 @@ function createSchema ({ resolvers, objects, models }) {
 
   const basePropsTypes = getFields({ model: BaseObjectModel })
   // const basePropsArgs = toNonNull(basePropsTypes)
-  const linkPropsArgs = pick(basePropsTypes, linkProps)
-  const schema = new GraphQLSchema({
-    query: QueryType,
-    // mutation: MutationType,
-    types: getValues(TYPES)
+  const linkPropsArgs = _.pick(basePropsTypes, linkProps)
+  const addModels = newBatch => {
+    newBatch = normalizeModels(newBatch)
+    const ids = Object.keys(newBatch)
+    for (const id of ids) {
+      if (id in models) {
+        if (_.isEqual(models[id], newBatch)) {
+          delete newBatch[id]
+        }
+      } else {
+        // lazy
+        defineGetter(schemas, id, () => getType({ model: models[id] }))
+      }
+    }
+
+    getInstantiableModels(newBatch).forEach(id => {
+      const model = newBatch[id]
+      const type = getType({ model })
+      queryTypeFields[getGetterFieldName(id)] = {
+        type,
+        args: linkPropsArgs,
+        resolve: getGetter({ model })
+      }
+
+      queryTypeFields[getConnectionFieldName(id)] = {
+        type: getConnectionType({ model }),
+        args: getConnectionArgs({ model }),
+        resolve: getLister({ model })
+      }
+    })
+
+    _.extend(models, newBatch)
+  }
+
+  const queryTypeFields = {
+    node: nodeField,
+    [modelsVersionIdField.name]: modelsVersionIdField.field
+  }
+
+  /**
+   * This is the type that will be the root of our query,
+   * and the entry point into our schema.
+   */
+  const QueryType = new GraphQLObjectType({
+    name: 'Query',
+    fields: () => queryTypeFields
   })
 
+  if (opts.models) {
+    addModels(opts.models)
+  }
+
   return {
-    schema,
-    schemas
+    get schema() {
+      return new GraphQLSchema({
+        query: QueryType,
+        // mutation: MutationType,
+        // types: _.values(TYPES)
+      })
+    },
+    schemas,
+    addModels
   }
 }
 
