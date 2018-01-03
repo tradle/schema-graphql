@@ -772,7 +772,7 @@ function createSchema (opts={}) {
   // const basePropsArgs = toNonNull(basePropsTypes)
   const linkPropsArgs = _.pick(basePropsTypes, linkProps)
   const addModels = newBatch => {
-    newBatch = normalizeModels(newBatch)
+    newBatch = normalizeModels(newBatch, models)
     const ids = Object.keys(newBatch)
     for (const id of ids) {
       if (id in models) {

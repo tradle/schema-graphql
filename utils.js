@@ -156,15 +156,16 @@ function unique (strings) {
 //   })
 // }
 
-function normalizeModels (models) {
+function normalizeModels (models, base={}) {
   // models = filterObject(models, model => {
   //   return !isInstantiable(model) || hasNonProtocolProps(model)
   // })
 
   models = _.cloneDeep(models)
-  forEachPropIn(models, addProtocolProps, models)
-  forEachPropIn(models, addCustomProps, models)
-  forEachPropIn(models, addNestedProps, models)
+  const all = _.extend({}, models, base)
+  forEachPropIn(models, addProtocolProps, all)
+  forEachPropIn(models, addCustomProps, all)
+  forEachPropIn(models, addNestedProps, all)
   // return fixEnums(addedProtocol)
   return models
 }
