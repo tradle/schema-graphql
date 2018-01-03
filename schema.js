@@ -40,7 +40,10 @@ const {
   getRequiredProperties,
   getRef,
   normalizeNestedProps,
-  cachify,
+  memoizeByModel,
+  memoizeByModelAndInput,
+  memoizeByModelAndOperator,
+  getOperatorType,
   // toNonNull,
   debug,
   defineGetter
@@ -52,7 +55,25 @@ const TYPE = '_t'
 const linkProps = ['_link', '_permalink']
 const { TimestampType, BytesType, ResourceStubType } = require('./types')
 const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
-const StringWrapper = { type: GraphQLString }
+const wrappers = {
+  String: { type: GraphQLString },
+  Boolean: { type: GraphQLBoolean },
+  Int: { type: GraphQLInt },
+  Float: { type: GraphQLFloat },
+  Bytes: { type: BytesType },
+  JSON: { type: GraphQLJSON },
+  Timestamp: { type: TimestampType },
+  ResourceStubInput: { type: ResourceStubType.input },
+  ResourceStubOutput: { type: ResourceStubType.output },
+}
+
+wrappers.string = wrappers.String
+wrappers.boolean = wrappers.Boolean
+wrappers.enum = wrappers.String
+wrappers.bytes = wrappers.Bytes
+wrappers.number = wrappers.Float
+wrappers.date = wrappers.Timestamp
+
 // TODO: use getFields for this
 
 const OPERATOR_NAMES = Object.keys(OPERATORS)
@@ -79,7 +100,6 @@ function createSchema (opts={}) {
   const { resolvers, objects } = opts
   const models = {}
   const schemas = {}
-  const TYPES = {}
   const { nodeInterface, nodeField } = GraphQLRelay.nodeDefinitions(
     globalId => {
       const { type, id } = GraphQLRelay.fromGlobalId(globalId)
@@ -154,14 +174,14 @@ function createSchema (opts={}) {
   //   // })
   // }
 
-  // const getMutater = cachifyByModel(function ({ model }) {
+  // const getMutater = memoizeByModel(function ({ model }) {
   //   return co(function* (root, props) {
   //     validateMutation({ model, props })
   //     return resolvers.update({ model, props })
   //   })
   // })
 
-  const getGetter = cachifyByModel(function ({ model }) {
+  const getGetter = memoizeByModel(function ({ model }) {
     return co(function* (root, props) {
       if (isResourceStub(props)) {
         return getByStub({ model, stub: props })
@@ -173,7 +193,7 @@ function createSchema (opts={}) {
 
       return getByKey({ model, key: props })
     })
-  }, TYPES)
+  })
 
   function getByStub ({ model, stub }) {
     return resolvers.getByLink(parseStub(stub).link)
@@ -185,7 +205,7 @@ function createSchema (opts={}) {
     return resolvers.get({ model, key })
   })
 
-  const getBacklinkResolver = cachifyByModel(function ({ model }) {
+  const getBacklinkResolver = memoizeByModel(function ({ model }) {
     return co(function* (source, args, context, info) {
       const type = source[TYPE]
       const model = models[type]
@@ -264,7 +284,7 @@ function createSchema (opts={}) {
     }
   }
 
-  // const getLinkResolver = cachifyByModel(function ({ model }) {
+  // const getLinkResolver = memoizeByModel(function ({ model }) {
   //   return function (source, args, context, info) {
   //     const { fieldName } = info
   //     const stub = source[fieldName]
@@ -272,7 +292,7 @@ function createSchema (opts={}) {
   //   }
   // })
 
-  const getLister = cachifyByModel(function ({ model }) {
+  const getLister = memoizeByModel(function ({ model }) {
     return (source, args, context, info) => {
       args = _.cloneDeep(args)
       normalizeNestedProps({ model, args })
@@ -288,7 +308,7 @@ function createSchema (opts={}) {
   //   return id.replace(/[^_a-zA-Z0-9]/g, '_')
   // }
 
-  const getEnumType = cachifyByModelAndInput(function ({ model, operator }) {
+  const getEnumType = memoizeByModelAndInput(function ({ model, operator }) {
     if (isGoodEnumModel(model)) {
       return getResourceStubType({ operator })
     }
@@ -300,7 +320,7 @@ function createSchema (opts={}) {
     return operator ? ResourceStubType.input : ResourceStubType.output
   }
 
-  const getType = cachify(function ({ model, operator, inlined }) {
+  const getType = _.memoize(function ({ model, operator, inlined }) {
     if (isEnum(model)) {
       return getEnumType({ model, operator })
     }
@@ -325,8 +345,8 @@ function createSchema (opts={}) {
       interfaces: getInterfaces({ model, operator }),
       fields: () => getFields({ model, operator, inlined })
     })
-  }, ({ model, operator, inlined }) => {
-    return [model.id, getOperatorType(operator) || '', getInlinedMarker(inlined)].join('~')
+  }, opts => {
+    return [opts.model.id, getOperatorType(opts.operator) || '', getInlinedMarker(opts.inlined)].join('~')
   })
 
   const getConnectionType = ({ model }) =>
@@ -335,10 +355,10 @@ function createSchema (opts={}) {
   // const getEdgeType = ({ model }) =>
   //   getConnectionDefinition({ model }).edgeType
 
-  const getConnectionDefinition = cachifyByModel(({ model }) => {
+  const getConnectionDefinition = memoizeByModel(opts => {
     return GraphQLRelay.connectionDefinitions({
-      name: getTypeName({ model }),
-      nodeType: getType({ model })
+      name: getTypeName(opts),
+      nodeType: getType(opts)
       // fields: {
       //   edges: getEdge({ model }),
       //   pageInfo: new GraphQLNonNull(PageInfoType)
@@ -369,7 +389,7 @@ function createSchema (opts={}) {
     return myInterfaces
   }
 
-  const getOperatorFields = cachifyByModel(function ({ model }) {
+  const getOperatorFields = memoizeByModel(({ model }) => {
     return {
       filter: {
         type: getFilterField({ model })
@@ -385,9 +405,10 @@ function createSchema (opts={}) {
   })
 
   const getArgs = getOperatorFields
-  const getFilterField = cachifyByModel(function ({ model }) {
+  const getFilterField = memoizeByModel(({ model }) => {
+    const typeName = getTypeName({ model })
     return new GraphQLInputObjectType({
-      name: 'filter_' + getTypeName({ model }),
+      name: `filter_${typeName}`,
       fields: () => {
         const selector = getSelectorOperatorField({ model, operator: 'IN' })
         const fields = {
@@ -422,7 +443,7 @@ function createSchema (opts={}) {
     })
   })
 
-  const getNullOperatorField = cachifyByModelAndOperator(function ({ model, operator='NULL' }) {
+  const getNullOperatorField = memoizeByModelAndOperator(({ model, operator='NULL' }) => {
     const { properties } = model
     const required = getRequiredProperties({ model })
     // exclude "required" as they are required to be not null
@@ -436,7 +457,7 @@ function createSchema (opts={}) {
       fields: () => {
         const fields = {}
         propertyNames.forEach(propertyName => {
-          fields[getFieldName(propertyName)] = { type: GraphQLBoolean }
+          fields[getFieldName(propertyName)] = wrappers.Boolean
         })
 
         return fields
@@ -444,7 +465,7 @@ function createSchema (opts={}) {
     })
   })
 
-  const getSelectorOperatorField = cachifyByModel(function ({ model, operator }) {
+  const getSelectorOperatorField = memoizeByModel(({ model, operator }) => {
     const { properties } = model
     const propertyNames = getProperties(model)
     return new GraphQLInputObjectType({
@@ -478,21 +499,19 @@ function createSchema (opts={}) {
     })
   })
 
-  const getOrderByField = function getOrderByField ({ model }) {
+  const getOrderByField = ({ model }) => {
     return new GraphQLInputObjectType({
       name: `orderby_${getTypeName({ model })}`,
       fields: {
         property: {
           type: getPropertiesEnumType({ model })
         },
-        desc: {
-          type: GraphQLBoolean
-        }
+        desc: wrappers.Boolean
       }
     })
   }
 
-  const getPropertiesEnumType = cachifyByModel(function ({ model }) {
+  const getPropertiesEnumType = memoizeByModel(({ model }) => {
     const values = {}
     const { properties } = model
     for (let propertyName in properties) {
@@ -501,21 +520,18 @@ function createSchema (opts={}) {
       values[fieldName] = { value: fieldName }
     }
 
+    const typeName = getTypeName({ model })
     return new GraphQLEnumType({
-      name: 'properties_' + getTypeName({ model }),
+      name: `properties_${typeName}`,
       values
     })
   })
 
-  function isNodeModel (model) {
-    return !model.inlined
-  }
+  const isNodeModel = model => !model.inlined
+  const isNestedProperty = propertyName => propertyName.indexOf('.') !== -1
 
-  function isNestedProperty (propertyName) {
-    return propertyName.indexOf('.') !== -1
-  }
-
-  function getFields ({ model, operator, inlined }) {
+  // doesn't benefit from memoization
+  const getFields = ({ model, operator, inlined }) => {
     const required = operator ? [] : getRequiredProperties({ model, inlined })
     const { properties } = model
     const fields = {}
@@ -545,17 +561,19 @@ function createSchema (opts={}) {
     })
 
     if (!isInput && isNodeModel(model)) {
-      fields.id = GraphQLRelay.globalIdField(model.id, getGlobalId)
+      fields.id = getGlobalIdField(model)
     }
 
     return fields
   }
 
-  function getFieldName (propertyName) {
-    return propertyName.split('.').join(NESTED_PROP_SEPARATOR)
-  }
+  const getGlobalIdField = _.memoize(
+    model => GraphQLRelay.globalIdField(model.id, getGlobalId),
+    model => model.id
+  )
 
-  const createField = cachify(function ({
+  const getFieldName = _.memoize(propertyName => propertyName.split('.').join(NESTED_PROP_SEPARATOR))
+  const createField = _.memoize(function ({
     propertyName,
     property,
     model,
@@ -576,17 +594,15 @@ function createSchema (opts={}) {
     if (description) field.description = description
 
     return field
-  }, ({
-    model,
-    propertyName,
-    operator
-  }) => `${operator ? 'i' : 'o'}~${model.id}~${propertyName}~${operator||''}`)
+  }, opts => `${opts.operator ? 'i' : 'o'}~${opts.model.id}~${opts.propertyName}~${opts.operator||''}`)
+
+  const getNonNull = _.memoize(type => new GraphQLNonNull(type))
 
   function getFieldType (propertyInfo) {
     const { property, isRequired } = propertyInfo
     let { type, resolve } = _getFieldType(propertyInfo)
     if (isRequired || !isNullableProperty(property)) {
-      type = new GraphQLNonNull(type)
+      type = getNonNull(type)
     }
 
     return { type, resolve }
@@ -595,39 +611,31 @@ function createSchema (opts={}) {
   function _getFieldType ({ propertyName, property, model, isRequired, operator }) {
     const { type, range } = property
     if (range === 'json') {
-      return { type: GraphQLJSON }
+      return wrappers.JSON
     }
 
-    switch (type) {
-      case 'bytes':
-        return { type: BytesType }
-      case 'string':
-        return StringWrapper
-      case 'boolean':
-        return { type: GraphQLBoolean }
-      case 'number':
-        return { type: GraphQLFloat }
-      case 'date':
-        return { type: TimestampType }
-      case 'object':
-        return getObjectValueType({
-          model,
-          propertyName,
-          property,
-          operator
-        })
-      case 'array':
-        return getArrayValueType({
-          model,
-          propertyName,
-          property,
-          operator
-        })
-      case 'enum':
-        return { type: GraphQLString }
-      default:
-        throw new Error(`${model.id} property ${propertyName} has unexpected type: ${type}`)
+    const scalar = wrappers[type]
+    if (scalar) return scalar
+
+    if (type === 'object') {
+      return getObjectValueType({
+        model,
+        propertyName,
+        property,
+        operator
+      })
     }
+
+    if (type === 'array') {
+      return getArrayValueType({
+        model,
+        propertyName,
+        property,
+        operator
+      })
+    }
+
+    throw new Error(`${model.id} property ${propertyName} has unexpected type: ${type}`)
   }
 
   function getObjectValueType (opts) {
@@ -676,7 +684,7 @@ function createSchema (opts={}) {
   })
 
 
-  const getConnectionArgs = cachifyByModel(({ model }) => {
+  const getConnectionArgs = memoizeByModel(({ model }) => {
     const cArgs = _.extend({}, getArgs({ model }), connectionArgs)
     cArgs.limit = connectionArgs.first
     cArgs.checkpoint = connectionArgs.after
@@ -714,7 +722,7 @@ function createSchema (opts={}) {
     const ref = getRef(property)
     const range = models[ref]
     if (!range) {
-      return { type: GraphQLJSON }
+      return wrappers.JSON
     }
 
     const maybeToList = property.type === 'array' ? toListType : IDENTITY_FN
@@ -733,12 +741,12 @@ function createSchema (opts={}) {
 
       // ideally we would want to return a json with _t required
       // and an arbitrary set of other props
-      return { type: GraphQLJSON }
+      return wrappers.JSON
     }
 
     // input
     if (operator) {
-      return { type: ResourceStubType.input }
+      return wrappers.ResourceStubInput
     }
 
     // output
@@ -802,6 +810,7 @@ function createSchema (opts={}) {
     })
 
     _.extend(models, newBatch)
+    return api
   }
 
   const queryTypeFields = {
@@ -818,11 +827,7 @@ function createSchema (opts={}) {
     fields: () => queryTypeFields
   })
 
-  if (opts.models) {
-    addModels(opts.models)
-  }
-
-  return {
+  const api = {
     get schema() {
       return new GraphQLSchema({
         query: QueryType,
@@ -833,43 +838,16 @@ function createSchema (opts={}) {
     schemas,
     addModels
   }
-}
 
-function getOperatorType (operator) {
-  if (operator) {
-    if (OPERATORS[operator].scalar) {
-      return 'scalar_compare'
-    }
-
-    return 'compare'
+  if (opts.models) {
+    addModels(opts.models)
   }
+
+  return api
 }
 
 function getInlinedMarker (inlined) {
   return inlined ? 'in' : 'out'
-}
-
-function cachifyByModel (fn, cache={}) {
-  return cachify(fn, ({ model }) => model.id, cache)
-}
-
-function cachifyByModelAndOperatorType (fn, cache={}) {
-  return cachify(fn, ({ model, operator }) => {
-    return `${getOperatorType(operator) || ''}~${model.id}`
-  }, cache)
-}
-
-function cachifyByModelAndOperator (fn, cache={}) {
-  return cachify(fn, ({ model, operator }) => {
-    return `${model.id}~${operator}`
-  }, cache)
-}
-
-function cachifyByModelAndInput (fn, cache={}) {
-  return cachify(fn, ({ model, operator }) => {
-    // i for input, o for output
-    return `${operator ? 'i' : 'o'}~${model.id}`
-  }, cache)
 }
 
 function alwaysTrue () {

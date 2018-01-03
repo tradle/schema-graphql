@@ -6,9 +6,10 @@
   "author": "Mark Vayngrib <mark@tradle.io>",
   "license": "MIT",
   "devDependencies": {
-    "@tradle/custom-models": "https://github.com/tradle/custom-models",
+    "@tradle/custom-models": "github:tradle/custom-models",
     "@tradle/engine": "^5.5.0",
     "@tradle/models": "github:tradle/models",
+    "@tradle/models-corporate-onboarding": "github:tradle/models-corporate-onboarding",
     "@tradle/validate-model": "^4.1.0",
     "@tradle/validate-resource": "^2.5.0",
     "eslint": "^3.19.0",

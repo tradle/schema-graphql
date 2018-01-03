@@ -16,48 +16,36 @@ const BaseObjectModel = require('./object-model')
 const BASE_REQUIRED_INLINED = [TYPE]
 // const ObjectPropNames = Object.keys(BaseObjectModel.properties)
 const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
-
-module.exports = {
-  debug,
-  lazy,
-  isResourceStub,
-  isBadEnumModel,
-  isGoodEnumModel,
-  isNullableProperty,
-  isScalarProperty,
-  normalizeModels,
-  normalizeNestedProps,
-  cachify,
-  toNonNull,
-  getProperties,
-  getRequiredProperties,
-  getInstantiableModels,
-  getRef,
-  getTypeName,
-  fromResourceStub,
-  defineGetter
+const OPERATORS = require('./operators')
+const AUTHOR_TITLE_PROP = {
+  type: 'string'
 }
 
-function cachify (fn, getId, cache={}) {
-  return function (...args) {
-    const id = getId(...args)
-    if (!(id in cache)) {
-      cache[id] = fn.apply(this, args)
-    }
+const memoizeByModel = fn => _.memoize(fn, opts => opts.model.id)
 
-    return cache[id]
-  }
-}
+// function memoizeByModelAndOperatorType (fn) {
+//   return _.memoize(fn, opts => {
+//     return `${getOperatorType(opts.operator) || ''}~${opts.model.id}`
+//   })
+// }
 
-function toNonNull (types) {
-  return mapObject(types, wrapper => {
-    return _.extend({}, wrapper, {
-      type: new GraphQLNonNull(wrapper.type)
-    })
-  })
-}
+const memoizeByModelAndOperator = fn =>
+  _.memoize(fn, opts => `${opts.model.id}~${opts.operator}`)
 
-function isResourceStub (props) {
+const memoizeByModelAndInput = fn => _.memoize(fn, opts => {
+  // i for input, o for output
+  return `${opts.operator ? 'i' : 'o'}~${opts.model.id}`
+})
+
+// function toNonNull (types) {
+//   return mapObject(types, wrapper => {
+//     return _.extend({}, wrapper, {
+//       type: new GraphQLNonNull(wrapper.type)
+//     })
+//   })
+// }
+
+const isResourceStub = props => {
   const keys = Object.keys(props)
   return keys.length === ResourceStubType.propertyNames &&
     _.isEqual(keys.sort(), ResourceStubType.propertyNames)
@@ -134,6 +122,7 @@ function expandGroupProps (model, arr) {
   return props
 }
 
+// faster than lodash
 function unique (strings) {
   const obj = {}
   for (let str of strings) {
@@ -173,9 +162,7 @@ function normalizeModels (models, base={}) {
 function addCustomProps (model) {
   if (model.inlined) return
 
-  model.properties._authorTitle = {
-    type: 'string'
-  }
+  model.properties._authorTitle = AUTHOR_TITLE_PROP
 }
 
 function addNestedProps (model, models) {
@@ -211,7 +198,7 @@ function addNestedProps (model, models) {
   return model
 }
 
-function getRequiredProperties ({ model, inlined }) {
+const getRequiredProperties = _.memoize(({ model, inlined }) => {
   let required = model.required || []
   if (inlined) {
     required = required.concat(BASE_REQUIRED_INLINED)
@@ -220,24 +207,20 @@ function getRequiredProperties ({ model, inlined }) {
   }
 
   return unique(required)
-}
+}, ({ model, inlined }) => inlined ? 'i_' + model.id : 'o_' + model.id)
 
 function getRef (property) {
   return property.ref || (property.items && property.items.ref)
 }
 
-function getProperties (model) {
+const getProperties = _.memoize(model => {
   const props = Object.keys(model.properties)
   if (props.includes('id')) {
     throw new Error(`"id" is a reserved property, model ${model.id} needs to learn its place`)
   }
 
   return props
-
-    // .filter(propertyName => {
-    //   return propertyName.charAt(0) !== '_'
-    // })
-}
+}, model => model.id)
 
 function getInstantiableModels (models) {
   return Object.keys(models).filter(id => isInstantiable(models[id]))
@@ -358,4 +341,38 @@ function defineGetter (obj, prop, getter) {
   Object.defineProperty(obj, prop, {
     get: getter
   })
+}
+
+function getOperatorType (operator) {
+  if (operator) {
+    if (OPERATORS[operator].scalar) {
+      return 'scalar_compare'
+    }
+
+    return 'compare'
+  }
+}
+
+module.exports = {
+  debug,
+  lazy,
+  isResourceStub,
+  isBadEnumModel,
+  isGoodEnumModel,
+  isNullableProperty,
+  isScalarProperty,
+  normalizeModels,
+  normalizeNestedProps,
+  memoizeByModel,
+  memoizeByModelAndInput,
+  memoizeByModelAndOperator,
+  // toNonNull,
+  getProperties,
+  getRequiredProperties,
+  getInstantiableModels,
+  getRef,
+  getTypeName,
+  fromResourceStub,
+  defineGetter,
+  getOperatorType
 }
