@@ -167,7 +167,7 @@ function addCustomProps (model) {
 
 function addNestedProps (model, models) {
   const { properties } = model
-  getProperties(model).forEach(propertyName => {
+  Object.keys(model.properties).forEach(propertyName => {
     const property = properties[propertyName]
     if (property.type !== 'object' && property.type !== 'array') {
       return
@@ -214,12 +214,11 @@ function getRef (property) {
 }
 
 const getProperties = _.memoize(model => {
-  const props = Object.keys(model.properties)
-  if (props.includes('id')) {
+  if (model.properties.id) {
     throw new Error(`"id" is a reserved property, model ${model.id} needs to learn its place`)
   }
 
-  return props
+  return Object.keys(model.properties)
 }, model => model.id)
 
 function getInstantiableModels (models) {
@@ -248,14 +247,14 @@ function isSetOnCreate ({ model, propertyName }) {
   // if (!property.backlink) return true
 }
 
-function mapObject (obj, mapper, ...args) {
-  const mapped = {}
-  for (let key in obj) {
-    mapped[key] = mapper(obj[key], ...args)
-  }
+// function mapObject (obj, mapper, ...args) {
+//   const mapped = {}
+//   for (let key in obj) {
+//     mapped[key] = mapper(obj[key], ...args)
+//   }
 
-  return mapped
-}
+//   return mapped
+// }
 
 function forEachPropIn (obj, mapper, ...args) {
   for (let key in obj) {
@@ -263,17 +262,17 @@ function forEachPropIn (obj, mapper, ...args) {
   }
 }
 
-function lazy (fn) {
-  let val
-  let called
-  return function (...args) {
-    if (called) return val
+// function lazy (fn) {
+//   let val
+//   let called
+//   return function (...args) {
+//     if (called) return val
 
-    val = fn.apply(this, args)
-    called = true
-    return val
-  }
-}
+//     val = fn.apply(this, args)
+//     called = true
+//     return val
+//   }
+// }
 
 function getTypeName ({ model, type, operator, operatorType, inlined }) {
   if (!type) {
@@ -337,9 +336,14 @@ function fromResourceStub ({ id, title }) {
   return resource
 }
 
-function defineGetter (obj, prop, getter) {
+function defineGetter (obj, prop, getter, cache) {
+  let cached
   Object.defineProperty(obj, prop, {
-    get: getter
+    get: () => {
+      if (cache && cached) return cached
+
+      return cached = getter()
+    }
   })
 }
 
@@ -355,7 +359,7 @@ function getOperatorType (operator) {
 
 module.exports = {
   debug,
-  lazy,
+  // lazy,
   isResourceStub,
   isBadEnumModel,
   isGoodEnumModel,
