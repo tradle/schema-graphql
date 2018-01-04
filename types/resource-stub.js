@@ -29,7 +29,7 @@ const fields = {
 }
 
 const ResourceStubInputType = new GraphQLInputObjectType({
-  name: 'ResourceStubInput',
+  name: 'StubInput',
   description: 'resource stub',
   // value sent to the client
   serialize: identity,
@@ -40,7 +40,7 @@ const ResourceStubInputType = new GraphQLInputObjectType({
 })
 
 const ResourceStubOutputType = new GraphQLObjectType({
-  name: 'ResourceStub',
+  name: 'Stub',
   description: 'resource stub',
   // value sent to the client
   fields
