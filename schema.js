@@ -57,6 +57,7 @@ const { TimestampType, BytesType, ResourceStubType } = require('./types')
 const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
 const wrappers = {
   String: { type: GraphQLString },
+  StringList: { type: new GraphQLList(GraphQLString) },
   Boolean: { type: GraphQLBoolean },
   Int: { type: GraphQLInt },
   Float: { type: GraphQLFloat },
@@ -291,6 +292,17 @@ function createSchema (opts={}) {
   //     return getByStub({ model, stub })
   //   }
   // })
+
+  const listByLinks = co(function* (source, args, context, info) {
+    const { links=[], typed=[] } = args
+    // const all = links.map(link => ({ link })).concat(typed)
+    // const results = yield Promise.all(({ type, link })
+      // .map(link => resolvers.getByLink(link)))
+
+    return {
+      objects: yield Promise.all(links.map(link => resolvers.getByLink(link)))
+    }
+  })
 
   const getLister = memoizeByModel(function ({ model }) {
     return (source, args, context, info) => {
@@ -813,9 +825,32 @@ function createSchema (opts={}) {
     return api
   }
 
+  const objectListType = new GraphQLObjectType({
+    name: 'rl_objects',
+    fields: {
+      objects: wrappers.JSON
+    }
+  })
+
+  const rl_objects = {
+    type: objectListType,
+    args: {
+      links: wrappers.StringList,
+      // typed: new GraphQLInputObjectType({
+      //   name: 'rl_objects_args_typed',
+      //   fields: {
+      //     type: GraphQLString,
+      //     link: GraphQLString
+      //   }
+      // })
+    },
+    resolve: listByLinks
+  }
+
   const queryTypeFields = {
     node: nodeField,
-    [modelsVersionIdField.name]: modelsVersionIdField.field
+    [modelsVersionIdField.name]: modelsVersionIdField.field,
+    rl_objects
   }
 
   /**
