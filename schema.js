@@ -407,7 +407,7 @@ function createSchema (opts={}) {
         type: getFilterField({ model })
       },
       orderBy: {
-        type: new GraphQLNonNull(getOrderByField({ model }))
+        type: getOrderByField({ model })
       },
       [modelsVersionIdField.name]: modelsVersionIdField.field
       // limit: {
