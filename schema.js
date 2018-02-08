@@ -269,7 +269,7 @@ function createSchema (opts={}) {
     const { items, startPosition, endPosition, itemToPosition } = result
     const limit = args.limit || args.first || args.last
     const checkpoint = args.checkpoint || args.before || args.after
-    const { orderBy } = args
+    const { orderBy={} } = args
     const edges = items.map(item => itemToEdge({ item, args, itemToPosition }))
     const hasNextPage = !orderBy.desc && typeof limit === 'number' ? edges.length === limit : false
     const hasPreviousPage = orderBy.desc && typeof limit === 'number' ? edges.length === limit : false
