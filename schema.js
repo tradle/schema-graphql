@@ -17,6 +17,7 @@ const {
 const GraphQLRelay = require('graphql-relay')
 const GraphQLJSON = require('graphql-type-json')
 const graphqlFields = require('graphql-fields')
+const allSettled = require('settle-promise').settle
 const {
   isInlinedProperty,
   isInstantiable,
@@ -299,8 +300,9 @@ function createSchema (opts={}) {
     // const results = yield Promise.all(({ type, link })
       // .map(link => resolvers.getByLink(link)))
 
+    const results = yield allSettled(links.map(link => resolvers.getByLink(link)))
     return {
-      objects: yield Promise.all(links.map(link => resolvers.getByLink(link)))
+      objects: results.map(({ value }) => value)
     }
   })
 
