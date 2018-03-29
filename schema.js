@@ -22,7 +22,8 @@ const {
   isInlinedProperty,
   isInstantiable,
   isEnum,
-  parseStub
+  parseStub,
+  omitVirtual
 } = require('@tradle/validate-resource').utils
 const buildResource = require('@tradle/build-resource')
 const OPERATORS = require('./operators')
@@ -43,6 +44,7 @@ const {
   normalizeNestedProps,
   memoizeByModel,
   memoizeByModelAndInput,
+  memoizeByModelAndBacklink,
   memoizeByModelAndOperator,
   getOperatorType,
   // toNonNull,
@@ -215,23 +217,37 @@ function createSchema (opts={}) {
       const backlinkProp = model.properties[fieldName]
       const ref = getRef(backlinkProp)
       const backlinkModel = models[ref]
-      if (!(backlinkModel && isInstantiable(backlinkModel))) {
+      if (!backlinkModel) {
         debug(`unable to resolve backlink: ${model.id}.${fieldName}`)
         return []
       }
 
       const { backlink } = backlinkProp.items
       const backlinkDotId = `${backlink}.id`
+      const parsedStub = {
+        type: source[TYPE],
+        link: source._link,
+        permalink: source._permalink
+      }
+
       return fetchList({
+        backlink: {
+          target: parsedStub,
+          forward: {
+            model,
+            propertyName: fieldName
+          },
+          back: {
+            model: backlinkModel,
+            propertyName: backlink,
+          }
+        },
         model: backlinkModel,
         source,
         args: {
           filter: {
             EQ: {
-              [backlinkDotId]: buildResource.id({
-                model,
-                resource: source
-              })
+              [backlinkDotId]: buildResource.id(parsedStub)
             }
           }
         },
@@ -259,11 +275,12 @@ function createSchema (opts={}) {
   }
 
   const itemToEdge = ({ item, args, itemToPosition }) => {
-    const position = itemToPosition(item)
-    return {
-      cursor: positionToCursor(position),
-      node: item
+    const edge = { node: item }
+    if (itemToPosition) {
+      edge.cursor = positionToCursor(itemToPosition(item))
     }
+
+    return edge
   }
 
   const connectionToArray = (result, args) => {
@@ -274,11 +291,18 @@ function createSchema (opts={}) {
     const edges = items.map(item => itemToEdge({ item, args, itemToPosition }))
     const hasNextPage = !orderBy.desc && typeof limit === 'number' ? edges.length === limit : false
     const hasPreviousPage = orderBy.desc && typeof limit === 'number' ? edges.length === limit : false
+    let startCursor = null
+    let endCursor = null
+    if (edges.length) {
+      if (startPosition) startCursor = positionToCursor(startPosition)
+      if (endPosition) endCursor = positionToCursor(endPosition)
+    }
+
     return {
       edges,
       pageInfo: {
-        startCursor: edges.length ? positionToCursor(startPosition) : null,
-        endCursor: edges.length ? positionToCursor(endPosition) : null,
+        startCursor,
+        endCursor,
         // hasPreviousPage: typeof last === 'number' ? !!after : false,
         hasPreviousPage,
         hasNextPage
@@ -334,7 +358,7 @@ function createSchema (opts={}) {
     return operator ? ResourceStubType.input : ResourceStubType.output
   }
 
-  const getType = _.memoize(function ({ model, operator, inlined }) {
+  const getType = _.memoize(function ({ model, operator, inlined, backlink }) {
     if (isEnum(model)) {
       return getEnumType({ model, operator })
     }
@@ -342,7 +366,7 @@ function createSchema (opts={}) {
     let ctor
     if (operator) {
       ctor = GraphQLInputObjectType
-    } else if (isInstantiable(model)) {
+    } else if (backlink || isInstantiable(model)) {
       ctor = GraphQLObjectType
     } else {
       return operator ? ResourceStubType.input : ResourceStubType.output
@@ -360,19 +384,20 @@ function createSchema (opts={}) {
       fields: () => getFields({ model, operator, inlined })
     })
   }, opts => {
-    return [opts.model.id, getOperatorType(opts.operator) || '', getInlinedMarker(opts.inlined)].join('~')
+    return [opts.model.id, getOperatorType(opts.operator) || '', getInlinedMarker(opts.inlined), getBacklinkMarker(opts.inlined)].join('~')
   })
 
-  const getConnectionType = ({ model }) =>
-    getConnectionDefinition({ model }).connectionType
+  const getConnectionType = ({ model, backlink }) =>
+    getConnectionDefinition({ model, backlink }).connectionType
 
   // const getEdgeType = ({ model }) =>
   //   getConnectionDefinition({ model }).edgeType
 
   const getConnectionDefinition = memoizeByModel(opts => {
+    const nodeType = getType(opts)
     return GraphQLRelay.connectionDefinitions({
-      name: getTypeName(opts),
-      nodeType: getType(opts)
+      name: nodeType.name,
+      nodeType
       // fields: {
       //   edges: getEdge({ model }),
       //   pageInfo: new GraphQLNonNull(PageInfoType)
@@ -765,7 +790,7 @@ function createSchema (opts={}) {
 
     // output
     // e.g. interface or abstract class
-    if (!isInstantiable(range)) {
+    if (!isInstantiable(range) && !isBacklink(property)) {
       debug(`not sure how to handle property ${model.id}.${propertyName} with range ${ref}`)
       return {
         type: maybeToList(ResourceStubType.output)
@@ -775,7 +800,7 @@ function createSchema (opts={}) {
     const ret = {}
     if (property.type === 'array') {
       if (property.items.backlink) {
-        ret.type = getConnectionType({ model: range })
+        ret.type = getConnectionType({ model: range, backlink: true })
         ret.resolve = getBacklinkResolver({ model: range })
         ret.args = getConnectionArgs({ model: range })
       } else {
@@ -887,6 +912,10 @@ function getInlinedMarker (inlined) {
   return inlined ? 'in' : 'out'
 }
 
+function getBacklinkMarker (backlink) {
+  return backlink ? 'b' : ''
+}
+
 function alwaysTrue () {
   return true
 }
@@ -923,4 +952,9 @@ function toListType (type) {
   return new GraphQLList(type)
 }
 
+function isBacklink (property) {
+  return property.items && property.items.backlink
+}
+
 module.exports = createSchema
+

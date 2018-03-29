@@ -22,6 +22,9 @@ const AUTHOR_TITLE_PROP = {
 }
 
 const memoizeByModel = fn => _.memoize(fn, opts => opts.model.id)
+const memoizeByModelAndBacklink = fn => _.memoize(fn, ({ model, backlink }) => {
+  return `${model.id}:${backlink ? 'b' : ''}`
+})
 
 // function memoizeByModelAndOperatorType (fn) {
 //   return _.memoize(fn, opts => {
@@ -364,6 +367,7 @@ module.exports = {
   normalizeNestedProps,
   memoizeByModel,
   memoizeByModelAndInput,
+  memoizeByModelAndBacklink,
   memoizeByModelAndOperator,
   // toNonNull,
   getProperties,
