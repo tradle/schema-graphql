@@ -209,41 +209,29 @@ function createSchema (opts={}) {
     return resolvers.get({ model, key })
   })
 
-  const getBacklinkResolver = memoizeByModel(function ({ model }) {
-    return co(function* (source, args, context, info) {
-      const type = source[TYPE]
-      const model = models[type]
-      const { fieldName } = info
-      const backlinkProp = model.properties[fieldName]
-      const ref = getRef(backlinkProp)
-      const backlinkModel = models[ref]
-      if (!backlinkModel) {
-        debug(`unable to resolve backlink: ${model.id}.${fieldName}`)
-        return []
-      }
-
-      const { backlink } = backlinkProp.items
-      const backlinkDotId = `${backlink}.id`
+  const getBacklinkResolver = function ({ sourceModel, targetModel, linkProp, backlinkProp }) {
+    return co(function* (target, args, context, info) {
+      const backlinkDotId = `${linkProp}.id`
       const parsedStub = {
-        type: source[TYPE],
-        link: source._link,
-        permalink: source._permalink
+        type: targetModel.id,
+        link: target._link,
+        permalink: target._permalink
       }
 
       return fetchList({
         backlink: {
           target: parsedStub,
           forward: {
-            model,
-            propertyName: fieldName
+            model: sourceModel,
+            propertyName: linkProp
           },
           back: {
-            model: backlinkModel,
-            propertyName: backlink,
+            model: targetModel,
+            propertyName: backlinkProp
           }
         },
-        model: backlinkModel,
-        source,
+        model: sourceModel,
+        source: target,
         args: {
           filter: {
             EQ: {
@@ -254,10 +242,10 @@ function createSchema (opts={}) {
         info
       })
     })
-  })
+  }
 
   const fetchList = (opts) => {
-    const { args, info } = opts
+    const { args, info, model } = opts
     const { first, last, limit, checkpoint, orderBy, filter } = args
     if (checkpoint) {
       opts.checkpoint = positionFromCursor(checkpoint)
@@ -801,7 +789,13 @@ function createSchema (opts={}) {
     if (property.type === 'array') {
       if (property.items.backlink) {
         ret.type = getConnectionType({ model: range, backlink: true })
-        ret.resolve = getBacklinkResolver({ model: range })
+        ret.resolve = getBacklinkResolver({
+          sourceModel: range,
+          targetModel: model,
+          linkProp: property.items.backlink,
+          backlinkProp: propertyName
+        })
+
         ret.args = getConnectionArgs({ model: range })
       } else {
         ret.type = toListType(ResourceStubType.output)
