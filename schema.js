@@ -459,12 +459,51 @@ function createSchema (opts={}) {
           }
         }
 
+        const SUBCLASS_OF = getSubclassOfField({ model })
+        if (SUBCLASS_OF) {
+          fields.SUBCLASS_OF = {
+            type: SUBCLASS_OF
+          }
+        }
+
         OPERATOR_NAMES.forEach(operator => {
           if (!fields[operator]) {
             fields[operator] = {
               type: getType({ model, operator })
             }
           }
+        })
+
+        return fields
+      }
+    })
+  })
+
+  const getSubclassOfField = memoizeByModel(({ model, operator='SUBCLASS_OF' }) => {
+    const { properties } = model
+    const propertyNames = getProperties(model)
+      .filter(propertyName => {
+        const { range } = properties[propertyName]
+        if (range !== 'model') return
+
+        if (!propertyName.includes('.')) return true
+
+        const parent = properties[propertyName.split('.')[0]]
+        const ref = getRef(parent)
+        const model = models[ref]
+        if (model) {
+          return model.abstract || model.isInterface
+        }
+      })
+
+    if (!propertyNames.length) return
+
+    return new GraphQLInputObjectType({
+      name: `${operator}_${getTypeName({ model })}`,
+      fields: () => {
+        const fields = {}
+        propertyNames.forEach(propertyName => {
+          fields[getFieldName(propertyName)] = wrappers.StringList
         })
 
         return fields

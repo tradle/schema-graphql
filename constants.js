@@ -1,10 +1,7 @@
 
-const { stubProps } = require('@tradle/validate-resource').utils
+const StubModel = require('./stub-model')
 
 module.exports = {
   NESTED_PROP_SEPARATOR: '__',
-  RESOURCE_STUB_PROPS: stubProps.sort().reduce((props, prop) => {
-    props[prop] = { type: 'string' }
-    return props
-  }, {})
+  RESOURCE_STUB_PROPS: StubModel.properties
 }

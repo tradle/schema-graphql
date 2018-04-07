@@ -38,6 +38,9 @@ module.exports = {
   GTE: {
     scalar: true
   },
+  SUBCLASS_OF: {
+    scalar: true
+  }
   // NOT IMPLEMENTED
   // OR: {
   //   type: 'array'
