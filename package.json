@@ -8,10 +8,10 @@
   "devDependencies": {
     "@tradle/custom-models": "github:tradle/custom-models",
     "@tradle/engine": "^5.5.0",
-    "@tradle/models": "github:tradle/models",
+    "@tradle/models": "github:tradle/models#backlinks",
     "@tradle/models-corporate-onboarding": "github:tradle/models-corporate-onboarding",
     "@tradle/validate-model": "^4.1.0",
-    "@tradle/validate-resource": "^2.5.0",
+    "@tradle/validate-resource": "github:tradle/validate-resource#stubs",
     "eslint": "^3.19.0",
     "husky": "^0.13.3",
     "tape": "^4.6.3"
@@ -22,7 +22,7 @@
     "prepush": "npm test"
   },
   "dependencies": {
-    "@tradle/build-resource": "^2.14.0",
+    "@tradle/build-resource": "github:tradle/build-resource#stubs",
     "@tradle/constants": "^2.1.0",
     "@tradle/merge-models": "^2.1.0",
     "co": "^4.6.0",

@@ -218,6 +218,7 @@ function createSchema (opts={}) {
         permalink: target._permalink
       }
 
+      normalizeNestedProps({ model: sourceModel, args })
       return fetchList({
         backlink: {
           target: parsedStub,
@@ -233,12 +234,12 @@ function createSchema (opts={}) {
         model: sourceModel,
         source: target,
         args: {
-          filter: {
+          filter: _.merge(args.filter || {}, {
             EQ: {
               [`${linkProp}.permalink`]: parsedStub.permalink
               // [backlinkDotId]: buildResource.id(parsedStub)
             }
-          }
+          })
         },
         info
       })
@@ -608,8 +609,7 @@ function createSchema (opts={}) {
     required=[],
     operator
   }) {
-    const { description } = property
-    const { type, resolve } = getFieldType({
+    const field = getFieldType({
       propertyName,
       property,
       model,
@@ -617,23 +617,19 @@ function createSchema (opts={}) {
       operator
     })
 
-    const field = { type }
-    if (resolve) field.resolve = resolve
-    if (description) field.description = description
-
-    return field
+    return _.extend({}, field, _.pick(property, 'description'))
   }, opts => `${opts.operator ? 'i' : 'o'}~${opts.model.id}~${opts.propertyName}~${opts.operator||''}`)
 
   const getNonNull = _.memoize(type => new GraphQLNonNull(type))
 
   function getFieldType (propertyInfo) {
     const { property, isRequired } = propertyInfo
-    let { type, resolve } = _getFieldType(propertyInfo)
+    const fType = _.clone(_getFieldType(propertyInfo))
     if (isRequired || !isNullableProperty(property)) {
-      type = getNonNull(type)
+      fType.type = getNonNull(fType.type)
     }
 
-    return { type, resolve }
+    return fType
   }
 
   function _getFieldType ({ propertyName, property, model, isRequired, operator }) {
