@@ -48,11 +48,11 @@ const memoizeByModelAndInput = fn => _.memoize(fn, opts => {
 //   })
 // }
 
-const isResourceStub = props => {
-  const keys = Object.keys(props)
-  return keys.length === ResourceStubType.propertyNames &&
-    _.isEqual(keys.sort(), ResourceStubType.propertyNames)
-}
+// const isResourceStub = props => {
+//   const keys = Object.keys(props)
+//   return keys.length === ResourceStubType.propertyNames &&
+//     _.isEqual(keys.sort(), ResourceStubType.propertyNames)
+// }
 
 function isComplexProperty ({ type, range }) {
   return type === 'object' ||
@@ -319,8 +319,8 @@ function normalizeNestedProps ({ args, model, models }) {
   }
 }
 
-function fromResourceStub ({ id, title }) {
-  const { type, link, permalink } = parseId(id)
+function fromResourceStub (stub) {
+  const { type, link, permalink } = parseStub(stub)
   const resource = {
     [TYPE]: type
   }
@@ -358,7 +358,7 @@ function getOperatorType (operator) {
 module.exports = {
   debug,
   // lazy,
-  isResourceStub,
+  // isResourceStub,
   isBadEnumModel,
   isGoodEnumModel,
   isNullableProperty,

@@ -6,6 +6,10 @@ const {
   GraphQLNonNull
 } = require('graphql/type')
 
+const {
+  stubProps
+} = require('@tradle/validate-resource').utils
+
 function identity (value) {
   return value
 }
@@ -16,16 +20,26 @@ function parseLiteral (ast) {
     return props
   }, {})
 
-  return _.pick(stub, ['id', 'title'])
+  return _.pick(stub, stubProps)
 }
 
 const fields = {
+  // "id" is deprecated
   id: {
     type: new GraphQLNonNull(GraphQLString)
   },
   title: {
     type: GraphQLString
-  }
+  },
+  type: {
+    type: GraphQLString
+  },
+  link: {
+    type: GraphQLString
+  },
+  permalink: {
+    type: GraphQLString
+  },
 }
 
 const ResourceStubInputType = new GraphQLInputObjectType({
@@ -49,5 +63,5 @@ const ResourceStubOutputType = new GraphQLObjectType({
 module.exports = {
   input: ResourceStubInputType,
   output: ResourceStubOutputType,
-  propertyNames: ['id', 'title']
+  propertyNames: stubProps
 }

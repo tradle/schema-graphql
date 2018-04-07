@@ -26,11 +26,11 @@ const {
   omitVirtual
 } = require('@tradle/validate-resource').utils
 const buildResource = require('@tradle/build-resource')
+const { isProbablyResourceStub } = buildResource
 const OPERATORS = require('./operators')
 const {
   normalizeModels,
   getTypeName,
-  isResourceStub,
   isNullableProperty,
   isScalarProperty,
   isGoodEnumModel,
@@ -187,7 +187,7 @@ function createSchema (opts={}) {
 
   const getGetter = memoizeByModel(function ({ model }) {
     return co(function* (root, props) {
-      if (isResourceStub(props)) {
+      if (isProbablyResourceStub(props)) {
         return getByStub({ model, stub: props })
       }
 
@@ -235,7 +235,8 @@ function createSchema (opts={}) {
         args: {
           filter: {
             EQ: {
-              [backlinkDotId]: buildResource.id(parsedStub)
+              [`${linkProp}.permalink`]: parsedStub.permalink
+              // [backlinkDotId]: buildResource.id(parsedStub)
             }
           }
         },
