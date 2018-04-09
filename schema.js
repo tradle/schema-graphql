@@ -1,5 +1,6 @@
 const _ = require('lodash')
 const co = require('co').wrap
+const stableStringify = require('json-stable-stringify')
 const {
   GraphQLSchema,
   GraphQLNonNull,
@@ -17,13 +18,15 @@ const {
 const GraphQLRelay = require('graphql-relay')
 const GraphQLJSON = require('graphql-type-json')
 const graphqlFields = require('graphql-fields')
+const { createBatchResolver } = require('graphql-resolve-batch')
 const allSettled = require('settle-promise').settle
 const {
   isInlinedProperty,
   isInstantiable,
   isEnum,
   parseStub,
-  omitVirtual
+  omitVirtual,
+  getPrimaryKeys
 } = require('@tradle/validate-resource').utils
 const buildResource = require('@tradle/build-resource')
 const { isProbablyResourceStub } = buildResource
@@ -186,7 +189,7 @@ function createSchema (opts={}) {
   // })
 
   const getGetter = memoizeByModel(function ({ model }) {
-    return co(function* (root, props) {
+    return co(function* (root, props, context, info) {
       if (isProbablyResourceStub(props)) {
         return getByStub({ model, stub: props })
       }
@@ -210,6 +213,7 @@ function createSchema (opts={}) {
   })
 
   const getBacklinkResolver = function ({ sourceModel, targetModel, linkProp, backlinkProp }) {
+    // return createBatchResolver(co(function* (target, args, context, info) {
     return co(function* (target, args, context, info) {
       const backlinkDotId = `${linkProp}.id`
       const parsedStub = {
@@ -635,8 +639,16 @@ function createSchema (opts={}) {
     return fields
   }
 
+  const getGlobalId = ({ model, resource }) => {
+    return new Buffer(stableStringify(getPrimaryKeys({ model, resource }))).toString('base64')
+  }
+
+  const idToGlobalId = (id) => {
+    return JSON.parse(new Buffer(id, 'base64').toString())
+  }
+
   const getGlobalIdField = _.memoize(
-    model => GraphQLRelay.globalIdField(model.id, getGlobalId),
+    model => GraphQLRelay.globalIdField(model.id, resource => getGlobalId({ model, resource })),
     model => model.id
   )
 
@@ -964,14 +976,6 @@ function positionFromCursor (cursor) {
   const pos = cursor.slice(CURSOR_PREFIX.length)
   return JSON.parse(new Buffer(pos, 'base64'))
   // return GraphQLRelay.fromGlobalId(globalId).id
-}
-
-function getGlobalId (item) {
-  return item._permalink
-}
-
-function idToGlobalId (id) {
-  return { _permalink: id }
 }
 
 function firstPropertyValue (obj) {

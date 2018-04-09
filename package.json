@@ -31,6 +31,7 @@
     "graphql-fields": "^1.0.2",
     "graphql-relay": "^0.5.2",
     "graphql-type-json": "^0.1.4",
+    "json-stable-stringify": "^1.0.1",
     "settle-promise": "^1.0.0",
     "typeforce": "^1.11.1"
   },
