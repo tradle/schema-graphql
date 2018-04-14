@@ -11,6 +11,11 @@ const {
   setVirtual,
   isInstantiable
 } = require('@tradle/validate-resource').utils
+
+const {
+  getNestedProperties
+} = require('@tradle/validate-model').utils
+
 const { ResourceStubType } = require('./types')
 const BaseObjectModel = require('./object-model')
 const BASE_REQUIRED_INLINED = [TYPE]
@@ -164,34 +169,36 @@ function addCustomProps (model) {
 }
 
 function addNestedProps (model, models) {
-  const { properties } = model
-  Object.keys(model.properties).forEach(propertyName => {
-    const property = properties[propertyName]
-    if (property.type !== 'object' && property.type !== 'array') {
-      return
-    }
+  return _.extend(model.properties, getNestedProperties({ models, model }))
 
-    if (property.range === 'json') {
-      return
-    }
+  // const { properties } = model
+  // Object.keys(model.properties).forEach(propertyName => {
+  //   const property = properties[propertyName]
+  //   if (property.type !== 'object' && property.type !== 'array') {
+  //     return
+  //   }
 
-    let nestedProps
-    if (isInlinedProperty({ models, property })) {
-      const ref = getRef(property)
-      if (ref === 'tradle.Model') return
+  //   if (property.range === 'json') {
+  //     return
+  //   }
 
-      nestedProps = ref
-        ? models[ref].properties
-        : property.properties || property.items.properties
+  //   let nestedProps
+  //   if (isInlinedProperty({ models, property })) {
+  //     const ref = getRef(property)
+  //     if (ref === 'tradle.Model') return
 
-    } else {
-      nestedProps = RESOURCE_STUB_PROPS
-    }
+  //     nestedProps = ref
+  //       ? models[ref].properties
+  //       : property.properties || property.items.properties
 
-    for (let p in nestedProps) {
-      properties[`${propertyName}.${p}`] = _.extend({}, nestedProps[p])
-    }
-  })
+  //   } else {
+  //     nestedProps = RESOURCE_STUB_PROPS
+  //   }
+
+  //   for (let p in nestedProps) {
+  //     properties[`${propertyName}.${p}`] = _.extend({}, nestedProps[p])
+  //   }
+  // })
 
   return model
 }

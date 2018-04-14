@@ -24,22 +24,18 @@ function parseLiteral (ast) {
 }
 
 const fields = {
-  // "id" is deprecated
-  id: {
+  _t: {
     type: new GraphQLNonNull(GraphQLString)
   },
-  title: {
-    type: GraphQLString
+  _link: {
+    type: new GraphQLNonNull(GraphQLString)
   },
-  type: {
-    type: GraphQLString
+  _permalink: {
+    type: new GraphQLNonNull(GraphQLString)
   },
-  link: {
+  _displayName: {
     type: GraphQLString
-  },
-  permalink: {
-    type: GraphQLString
-  },
+  }
 }
 
 const ResourceStubInputType = new GraphQLInputObjectType({

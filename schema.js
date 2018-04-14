@@ -18,7 +18,7 @@ const {
 const GraphQLRelay = require('graphql-relay')
 const GraphQLJSON = require('graphql-type-json')
 const graphqlFields = require('graphql-fields')
-const { createBatchResolver } = require('graphql-resolve-batch')
+// const { createBatchResolver } = require('graphql-resolve-batch')
 const allSettled = require('settle-promise').settle
 const {
   isInlinedProperty,
@@ -216,16 +216,10 @@ function createSchema (opts={}) {
     // return createBatchResolver(co(function* (target, args, context, info) {
     return co(function* (target, args, context, info) {
       const backlinkDotId = `${linkProp}.id`
-      const parsedStub = {
-        type: targetModel.id,
-        link: target._link,
-        permalink: target._permalink
-      }
-
       normalizeNestedProps({ model: sourceModel, args })
       return fetchList({
         backlink: {
-          target: parsedStub,
+          target,
           forward: {
             model: sourceModel,
             propertyName: linkProp
@@ -236,11 +230,12 @@ function createSchema (opts={}) {
           }
         },
         model: sourceModel,
+        // graphql "source" (not backlink source)
         source: target,
         args: {
           filter: _.merge(args.filter || {}, {
             EQ: {
-              [`${linkProp}.permalink`]: parsedStub.permalink
+              [`${linkProp}._permalink`]: target._permalink
               // [backlinkDotId]: buildResource.id(parsedStub)
             }
           })
