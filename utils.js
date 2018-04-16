@@ -16,11 +16,11 @@ const {
   getNestedProperties
 } = require('@tradle/validate-model').utils
 
-const { ResourceStubType } = require('./types')
+// const { ResourceStubType } = require('./types')
 const BaseObjectModel = require('./object-model')
 const BASE_REQUIRED_INLINED = [TYPE]
 // const ObjectPropNames = Object.keys(BaseObjectModel.properties)
-const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
+const { NESTED_PROP_SEPARATOR } = require('./constants')
 const OPERATORS = require('./operators')
 const AUTHOR_TITLE_PROP = {
   type: 'string'
@@ -170,37 +170,6 @@ function addCustomProps (model) {
 
 function addNestedProps (model, models) {
   return _.extend(model.properties, getNestedProperties({ models, model }))
-
-  // const { properties } = model
-  // Object.keys(model.properties).forEach(propertyName => {
-  //   const property = properties[propertyName]
-  //   if (property.type !== 'object' && property.type !== 'array') {
-  //     return
-  //   }
-
-  //   if (property.range === 'json') {
-  //     return
-  //   }
-
-  //   let nestedProps
-  //   if (isInlinedProperty({ models, property })) {
-  //     const ref = getRef(property)
-  //     if (ref === 'tradle.Model') return
-
-  //     nestedProps = ref
-  //       ? models[ref].properties
-  //       : property.properties || property.items.properties
-
-  //   } else {
-  //     nestedProps = RESOURCE_STUB_PROPS
-  //   }
-
-  //   for (let p in nestedProps) {
-  //     properties[`${propertyName}.${p}`] = _.extend({}, nestedProps[p])
-  //   }
-  // })
-
-  return model
 }
 
 const getRequiredProperties = _.memoize(({ model, inlined }) => {
@@ -326,21 +295,6 @@ function normalizeNestedProps ({ args, model, models }) {
   }
 }
 
-function fromResourceStub (stub) {
-  const { type, link, permalink } = parseStub(stub)
-  const resource = {
-    [TYPE]: type
-  }
-
-  setVirtual(resource, {
-    _link: link,
-    _permalink: permalink,
-    _displayName: title
-  })
-
-  return resource
-}
-
 function defineGetter (obj, prop, getter, cache) {
   let cached
   Object.defineProperty(obj, prop, {
@@ -382,7 +336,6 @@ module.exports = {
   getInstantiableModels,
   getRef,
   getTypeName,
-  fromResourceStub,
   defineGetter,
   getOperatorType
 }

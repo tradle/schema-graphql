@@ -25,7 +25,6 @@ const {
   isInstantiable,
   isEnum,
   parseStub,
-  omitVirtual,
   getPrimaryKeys
 } = require('@tradle/validate-resource').utils
 const buildResource = require('@tradle/build-resource')
@@ -37,17 +36,15 @@ const {
   isNullableProperty,
   isScalarProperty,
   isGoodEnumModel,
-  isBadEnumModel,
-  fromResourceStub,
   getInstantiableModels,
-  getOnCreateProperties,
+  // getOnCreateProperties,
   getProperties,
   getRequiredProperties,
   getRef,
   normalizeNestedProps,
   memoizeByModel,
   memoizeByModelAndInput,
-  memoizeByModelAndBacklink,
+  // memoizeByModelAndBacklink,
   memoizeByModelAndOperator,
   getOperatorType,
   // toNonNull,
@@ -60,7 +57,7 @@ const USE_INTERFACES = false
 const TYPE = '_t'
 const linkProps = ['_link', '_permalink']
 const { TimestampType, BytesType, ResourceStubType } = require('./types')
-const { NESTED_PROP_SEPARATOR, RESOURCE_STUB_PROPS } = require('./constants')
+const { NESTED_PROP_SEPARATOR } = require('./constants')
 const wrappers = {
   String: { type: GraphQLString },
   StringList: { type: new GraphQLList(GraphQLString) },
@@ -91,9 +88,9 @@ const CURSOR_PREFIX = ''// new Buffer('cursor:').toString('base64')
 const getGetterFieldName = type => `r_${getTypeName({ type })}`
 // const getListerFieldName = type => `rl_${getTypeName({ type })}`
 const getConnectionFieldName = type => `rl_${getTypeName({ type })}`
-const getCreaterFieldName = type => `c_${getTypeName({ type })}`
-const getUpdaterFieldName = type => `u_${getTypeName({ type })}`
-const getDeleterFieldName = type => `d_${getTypeName({ type })}`
+// const getCreaterFieldName = type => `c_${getTypeName({ type })}`
+// const getUpdaterFieldName = type => `u_${getTypeName({ type })}`
+// const getDeleterFieldName = type => `d_${getTypeName({ type })}`
 const BaseObjectModel = require('./object-model')
 const IDENTITY_FN = value => value
 const modelsVersionIdField = {
@@ -215,7 +212,6 @@ function createSchema (opts={}) {
   const getBacklinkResolver = function ({ sourceModel, targetModel, linkProp, backlinkProp }) {
     // return createBatchResolver(co(function* (target, args, context, info) {
     return co(function* (target, args, context, info) {
-      const backlinkDotId = `${linkProp}.id`
       normalizeNestedProps({ model: sourceModel, args })
       return fetchList({
         backlink: {
@@ -236,7 +232,6 @@ function createSchema (opts={}) {
           filter: _.merge(args.filter || {}, {
             EQ: {
               [`${linkProp}._permalink`]: target._permalink
-              // [backlinkDotId]: buildResource.id(parsedStub)
             }
           })
         },
