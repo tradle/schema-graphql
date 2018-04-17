@@ -56,7 +56,7 @@ const { connectionArgs } = GraphQLRelay
 const USE_INTERFACES = false
 const TYPE = '_t'
 const linkProps = ['_link', '_permalink']
-const { TimestampType, BytesType, ResourceStubType } = require('./types')
+const { TimestampType, BytesType, ResourceStubType, EnumType } = require('./types')
 const { NESTED_PROP_SEPARATOR } = require('./constants')
 const wrappers = {
   String: { type: GraphQLString },
@@ -332,15 +332,11 @@ function createSchema (opts={}) {
 
   const getEnumType = memoizeByModelAndInput(function ({ model, operator }) {
     if (isGoodEnumModel(model)) {
-      return getResourceStubType({ operator })
+      return operator ? EnumType.input : EnumType.output
     }
 
     return GraphQLJSON
   })
-
-  function getResourceStubType ({ operator }) {
-    return operator ? ResourceStubType.input : ResourceStubType.output
-  }
 
   const getType = _.memoize(function ({ model, operator, inlined, backlink }) {
     if (isEnum(model)) {
