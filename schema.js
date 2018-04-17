@@ -228,13 +228,13 @@ function createSchema (opts={}) {
         model: sourceModel,
         // graphql "source" (not backlink source)
         source: target,
-        args: {
-          filter: _.merge(args.filter || {}, {
+        args: _.merge(args, {
+          filter: {
             EQ: {
               [`${linkProp}._permalink`]: target._permalink
             }
-          })
-        },
+          }
+        }),
         info
       })
     })
