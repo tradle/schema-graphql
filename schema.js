@@ -27,6 +27,10 @@ const {
   parseStub,
   getPrimaryKeys
 } = require('@tradle/validate-resource').utils
+
+const {
+  getBacklinkProperties
+} = require('@tradle/validate-model').utils
 const buildResource = require('@tradle/build-resource')
 const { isProbablyResourceStub } = buildResource
 const OPERATORS = require('./operators')
@@ -186,7 +190,14 @@ function createSchema (opts={}) {
   // })
 
   const getGetter = memoizeByModel(function ({ model }) {
+    const blProps = getBacklinkProperties(model)
     return co(function* (root, props, context, info) {
+      const fields = graphqlFields(info)
+      const select = _.difference(Object.keys(fields), blProps)
+      if (select.every(prop => prop in props)) {
+        return props
+      }
+
       if (isProbablyResourceStub(props)) {
         return getByStub({ model, stub: props })
       }
