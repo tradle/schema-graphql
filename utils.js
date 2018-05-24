@@ -13,7 +13,8 @@ const {
 } = require('@tradle/validate-resource').utils
 
 const {
-  getNestedProperties
+  getNestedProperties,
+  getProperty
 } = require('@tradle/validate-model').utils
 
 // const { ResourceStubType } = require('./types')
@@ -116,10 +117,10 @@ function addProtocolProps (model) {
 
 function expandGroupProps (model, arr) {
   const props = []
-  for (const name of arr) {
-    const { group } = model.properties[name]
+  for (const propertyName of arr) {
+    const { group } = getProperty({ model, propertyName })
     // nested group props should be caught in @tradle/validate-model
-    props.push(group || name)
+    props.push(group || propertyName)
   }
 
   return props
