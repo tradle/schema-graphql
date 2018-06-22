@@ -181,7 +181,15 @@ const getRequiredProperties = _.memoize(({ model, inlined }) => {
     required = required.concat(BaseObjectModel.required)
   }
 
-  return unique(required)
+  required = unique(required)
+
+  // special case
+  if (model.id === 'tradle.Identity') {
+    const idx = required.indexOf('_author')
+    if (idx !== -1) required.splice(idx, 1)
+  }
+
+  return required
 }, ({ model, inlined }) => inlined ? 'i_' + model.id : 'o_' + model.id)
 
 function getRef (property) {
