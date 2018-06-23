@@ -105,7 +105,7 @@ const modelsVersionIdField = {
 }
 
 function createSchema (opts={}) {
-  const { resolvers, objects } = opts
+  const { resolvers, objects, validateRequired=true } = opts
   const models = {}
   const schemas = {}
   const { nodeInterface, nodeField } = GraphQLRelay.nodeDefinitions(
@@ -673,7 +673,7 @@ function createSchema (opts={}) {
   function getFieldType (propertyInfo) {
     const { property, isRequired } = propertyInfo
     const fType = _.clone(_getFieldType(propertyInfo))
-    if (isRequired || !isNullableProperty(property)) {
+    if ((validateRequired && isRequired) || !isNullableProperty(property)) {
       fType.type = getNonNull(fType.type)
     }
 
