@@ -203,16 +203,20 @@ function createSchema (opts={}) {
       }
 
       if (props._link) {
-        return resolvers.getByLink(props._link)
+        return resolvers.getByLink({
+          model,
+          link: props._link
+        })
       }
 
       return getByKey({ model, key: props })
     })
   })
 
-  function getByStub ({ model, stub }) {
-    return resolvers.getByLink(parseStub(stub).link)
-  }
+  const getByStub = ({ model, stub }) => resolvers.getByLink({
+    model,
+    link: parseStub(stub).link
+  })
 
   const getByKey = co(function* ({ model, key }) {
     // TODO: add ProjectionExpression with attributes to fetch
@@ -319,7 +323,7 @@ function createSchema (opts={}) {
     // const results = yield Promise.all(({ type, link })
       // .map(link => resolvers.getByLink(link)))
 
-    const results = yield allSettled(links.map(link => resolvers.getByLink(link)))
+    const results = yield allSettled(links.map(link => resolvers.getByLink({ link })))
     return {
       objects: results.map(({ value }) => value)
     }
