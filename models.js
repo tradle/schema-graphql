@@ -1,5 +1,5 @@
 module.exports = require('@tradle/merge-models')()
   .add(require('@tradle/models').models, { validate: false })
-  .add(require('@tradle/custom-models'), { validate: false })
-  .add(require('@tradle/models-corporate-onboarding'), { validate: false })
+  .add(require('@tradle/custom-models').models, { validate: false })
+  .add(require('@tradle/models-corporate-onboarding').models, { validate: false })
   .get()
