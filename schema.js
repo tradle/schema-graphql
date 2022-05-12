@@ -104,6 +104,13 @@ const modelsVersionIdField = {
   }
 }
 
+const allowField = {
+  name: 'allow',
+  field: {
+    type: GraphQLString
+  }
+}
+
 function createSchema (opts={}) {
   const { resolvers, objects, validateRequired=true } = opts
   const models = {}
@@ -431,7 +438,8 @@ function createSchema (opts={}) {
       orderBy: {
         type: getOrderByField({ model })
       },
-      [modelsVersionIdField.name]: modelsVersionIdField.field
+      [modelsVersionIdField.name]: modelsVersionIdField.field,
+      [allowField.name]: allowField.field
       // limit: {
       //   type: GraphQLInt
       // }
@@ -920,6 +928,7 @@ function createSchema (opts={}) {
   const queryTypeFields = {
     node: nodeField,
     [modelsVersionIdField.name]: modelsVersionIdField.field,
+    [allowField.name]: allowField.field,
     rl_objects
   }
 
