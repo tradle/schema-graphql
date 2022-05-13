@@ -216,7 +216,7 @@ function createSchema (opts={}) {
         })
       }
 
-      return getByKey({ model, key: props })
+      return getByKey({ model, key: props, context })
     })
   })
 
@@ -225,10 +225,10 @@ function createSchema (opts={}) {
     link: parseStub(stub).link
   })
 
-  const getByKey = co(function* ({ model, key }) {
+  const getByKey = co(function* ({ model, key, context }) {
     // TODO: add ProjectionExpression with attributes to fetch
     key[TYPE] = model.id
-    return resolvers.get({ model, key })
+    return resolvers.get({ model, key, context })
   })
 
   const getBacklinkResolver = function ({ sourceModel, targetModel, linkProp, backlinkProp }) {
@@ -248,6 +248,7 @@ function createSchema (opts={}) {
           }
         },
         model: sourceModel,
+        context,
         // graphql "source" (not backlink source)
         source: target,
         args: _.merge(args, {
